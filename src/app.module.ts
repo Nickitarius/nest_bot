@@ -3,8 +3,7 @@ import { TelegrafModule } from 'nestjs-telegraf';
 import { AppService } from './app.service';
 import { ClaimsModule } from './claims/claims.module';
 import { AppController } from './app.controller';
-
-// import { ConfigModule } from '@nestjs/config';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -18,19 +17,3 @@ import { AppController } from './app.controller';
   // providers: [AppService],
 })
 export class AppModule {}
-
-// TelegrafModule.forRoot({
-//   token: '7427864021:AAEzpz80ZfPEQnYMkPsKeKzO2O913kl_xGw',
-//   // useFactory: (configService: ConfigService) => ({
-//   //   token: configService.get<string>('TELEGRAM_BOT_TOKEN'),
-//   //   launchOptions: {
-//   //     webhook: {
-//   //       domain: 'domain.tld',
-//   //       path: '/secret-path',
-//   //     },
-//   //   },
-//   // }),
-//   // inject: [ConfigService],
-
-// }),
-// BotModule,

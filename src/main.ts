@@ -6,16 +6,6 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   await app.listen(3900);
 }
-// const BOT_TOKEN = '7427864021:AAEzpz80ZfPEQnYMkPsKeKzO2O913kl_xGw';
-
-// async function bootstrap() {
-//   const app = await NestFactory.create(AppModule);
-//   const bot = app.get(getBotToken());
-//   app.use(bot.webhookCallback('/secret-path'));
-
-//   // await app.listen(3900);
-// }
-
 bootstrap();
 
 const API_URL = 'localhost';
