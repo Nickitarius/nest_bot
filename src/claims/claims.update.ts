@@ -1,15 +1,6 @@
-import { HttpService } from '@nestjs/axios';
-import { AxiosError } from 'axios';
 import { Ctx, Hears, Help, On, Start, Update } from 'nestjs-telegraf';
-import { firstValueFrom } from 'rxjs';
-import { catchError } from 'rxjs/internal/operators/catchError';
 import { Context } from 'src/interfaces/context.interface';
 import { ClaimsService } from './claims.service';
-
-const API_URL = 'localhost';
-const API_PORT = 3700;
-const API_USER = 'usr';
-const API_PASS = 'pass';
 
 @Update()
 export class ClaimsUpdate {
