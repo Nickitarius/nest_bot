@@ -8,11 +8,7 @@ export class ClaimsUpdate {
 
   @Start()
   async start(@Ctx() ctx: Context) {
-    // try {
-    await ctx.reply(await this.claimsService.getShortClaims());
-    // } catch (error) {
-    //   console.log(error);
-    // }
+    await ctx.reply(await this.claimsService.getShortClaims(ctx));
   }
 
   @Help()
