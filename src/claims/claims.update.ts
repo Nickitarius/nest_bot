@@ -1,4 +1,4 @@
-import { Ctx, Hears, Help, On, Start, Update } from 'nestjs-telegraf';
+import { Action, Ctx, Hears, Help, On, Start, Update } from 'nestjs-telegraf';
 import { Context } from 'src/interfaces/context.interface';
 import { ClaimsService } from './claims.service';
 
@@ -8,17 +8,22 @@ export class ClaimsUpdate {
 
   @Start()
   async start(@Ctx() ctx: Context) {
-    await ctx.reply(await this.claimsService.getShortClaims(ctx));
+    await this.claimsService.getShortClaims(ctx);
   }
 
   @Help()
   async help(@Ctx() ctx: Context) {
-    await ctx.reply('Send me a sticker');
+    await this.claimsService.help(ctx);
   }
 
   @On('sticker')
   async on(@Ctx() ctx: Context) {
     await ctx.reply('👍');
+  }
+
+  @Action('getShortClaims')
+  async getShortClaims(@Ctx() ctx: Context) {
+    await this.claimsService.getShortClaims(ctx);
   }
 
   @Hears('hi')
