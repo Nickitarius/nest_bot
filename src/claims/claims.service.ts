@@ -102,16 +102,17 @@ export class ClaimsService {
           assigned = claim.assigned;
         }
 
-        keyboard.push(
+        keyboard.push([
           Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
-        );
+        ]);
       });
 
-      page = `***Список Заявок***\n\
-      *Общее количество*:  ${total}\n\
-      *Новых*: ${newClaims}\n\
-      *В работе*: ${takenWork}\n\
-      *Исполнитель*: ${assigned}`;
+      page = `***Список Заявок***
+*Общее количество*:  ${total}
+*Новых*: ${newClaims}
+*В работе*: ${takenWork}
+      
+*Исполнитель*: ${assigned}`;
     } else {
       this.logger.log(
         `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
@@ -125,12 +126,12 @@ export class ClaimsService {
       try {
         await context.editMessageText(
           `Для вас нет заявок :(\n\nUUID: ${uuidOne}\nUserID: ${user.id}`,
-          { parse_mode: 'Markdown', reply_markup: replyMarkup.reply_markup },
+          { parse_mode: 'MarkdownV2', reply_markup: replyMarkup.reply_markup },
         );
       } catch {
         await context.reply(
           `Для вас нет заявок :(\n\nUUID: ${uuidOne}\nUserID: ${user.id}`,
-          { parse_mode: 'Markdown', reply_markup: replyMarkup.reply_markup },
+          { parse_mode: 'MarkdownV2', reply_markup: replyMarkup.reply_markup },
         );
       }
 
@@ -140,21 +141,27 @@ export class ClaimsService {
     replyMarkup = Markup.inlineKeyboard(keyboard);
 
     try {
-      await context.editMessageText(page, replyMarkup);
+      await context.editMessageText(page, {
+        reply_markup: replyMarkup.reply_markup,
+        parse_mode: 'MarkdownV2',
+      });
     } catch {
-      await context.reply(page, replyMarkup);
+      await context.reply(page, {
+        reply_markup: replyMarkup.reply_markup,
+        parse_mode: 'MarkdownV2',
+      });
     }
 
     return;
   }
 
   async help(context: Context) {
-    const page = `Help\n\
-    1. Бери заявку в работу.\n\
-    2. Закрывай или возвращай обратно.\n\
-    3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.\n\
-    4. Можно по заявке узнать логин\пароль для PPPOE.\n\
-    5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
+    const page = `Help
+1. Бери заявку в работу.
+2. Закрывай или возвращай обратно.
+3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.
+4. Можно по заявке узнать логин\\пароль для PPPOE.
+5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
 
     const keyboard = [
       Markup.button.callback('Загрузить заявки', 'getShortClaims'),
