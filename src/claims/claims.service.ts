@@ -7,6 +7,7 @@ import { v4 as uuidV4 } from 'uuid';
 import * as fs from 'fs';
 import { Pagination } from 'telegraf-pagination';
 import { InjectBot } from 'nestjs-telegraf';
+// import { inlineKeyboard } from 'telegraf/typings/markup';
 
 @Injectable()
 export class ClaimsService {
@@ -146,6 +147,8 @@ export class ClaimsService {
 
     replyMarkup = Markup.inlineKeyboard(keyboard);
 
+    console.log(replyMarkup.reply_markup);
+
     try {
       await context.editMessageText(page, {
         reply_markup: replyMarkup.reply_markup,
@@ -248,14 +251,14 @@ export class ClaimsService {
 
     let page;
     // let tmpHead;
-    let tmp_claim;
+    let tmpClaim;
     let claims = [];
 
     if (data.length != 0) {
       const total = data.claims.length;
       const tmpHead = `***Список Заявок***
 *Общее количество*:  ${total}
-==========================`;
+==========================\n`; //.replaceAll('=', '\\=');
 
       // let newClaims = 0;
       // let takenWork = 0;
@@ -268,23 +271,6 @@ export class ClaimsService {
       let i = 0;
 
       data.claims.forEach((claim) => {
-        // claim = {
-        //   id: claim.id,
-        //   claim_no: claim.claim_no,
-        //   claim_date: claim.claim_date,
-        //   is_service: claim.is_service,
-        //   client_contract: claim.client_contract,
-        //   client_name: claim.client_name,
-        //   claim_phone: claim.claim_phone,
-        //   claim_addr: claim.claim_addr,
-        //   autor: claim.autor,
-        //   assigned: claim.assigned,
-        //   comment: claim.comment,
-        //   work_commentary: claim.work_commentary,
-        //   lw_date_change: claim.lw_date_change,
-        //   status_name: claim.status_name,
-        // };
-
         claim.claim_addr = claim.claim_addr.replaceAll('_', '-');
         claim.claim_date = claim.claim_date.replaceAll('_', '-');
         claim.client_contract = claim.client_contract.replaceAll('_', '-');
@@ -303,21 +289,22 @@ export class ClaimsService {
 
         claimsNo.push(claim.claim_no);
 
-        // page =
-        tmp_claim = `*Обращениe №:* ${claim.claim_no}
-        *Статус:* ${claim.status_name}
-        *Дата:* ${claim.claim_date}
-        *Договор:* ${claim.client_contract}
-        *Телефон:* ${claim.claim_phone}
-        *Имя:* ${claim.client_name}
-        *Адрес:* ${claim.claim_addr}
-        *Инициатор:* ${claim.autor}
-        *Исполнитель:* ${claim.assigned}
-        *Комментарий к заявке:* ${claim.comment}
-        *Комментарий к работе:* ${claim.work_commentary}
-  
-        `;
-        page += tmp_claim;
+        tmpClaim = `*Обращениe №:* ${claim.claim_no}
+*Статус:* ${claim.status_name}
+*Дата:* ${claim.claim_date}
+*Договор:* ${claim.client_contract}
+*Телефон:* ${claim.claim_phone}
+*Имя:* ${claim.client_name}
+*Адрес:* ${claim.claim_addr}
+*Инициатор:* ${claim.autor}
+*Исполнитель:* ${claim.assigned}
+*Комментарий к заявке:* ${claim.comment}
+*Комментарий к работе:* ${claim.work_commentary}
+
+`;
+
+        // tmpClaim = tmpClaim.replaceAll('-', '\\-');
+        page += tmpClaim;
 
         i += 1;
 
@@ -329,9 +316,9 @@ export class ClaimsService {
           claimsNo = [];
         }
 
-        // keyboard.push([
-        //   Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
-        // ]);
+        keyboard.push([
+          Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
+        ]);
       });
 
       if (page != '' && claimsNo.length != 0) {
@@ -350,41 +337,53 @@ export class ClaimsService {
       keyboard = [
         Markup.button.callback('Попробовать снова', 'getShortClaims'),
       ];
-      replyMarkup = Markup.inlineKeyboard(keyboard);
+      replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
       try {
         await context.editMessageText(
           `Для вас нет заявок :(\n\nUUID: ${uuidOne}\nUserID: ${user.id}`,
-          { parse_mode: 'MarkdownV2', reply_markup: replyMarkup.reply_markup },
+          { parse_mode: 'MarkdownV2', reply_markup: replyMarkup },
         );
       } catch {
         await context.reply(
           `Для вас нет заявок :(\n\nUUID: ${uuidOne}\nUserID: ${user.id}`,
-          { parse_mode: 'MarkdownV2', reply_markup: replyMarkup.reply_markup },
+          { parse_mode: 'MarkdownV2', reply_markup: replyMarkup },
         );
       }
 
       return;
     }
 
-    // const fakeData = Array(10)
-    //   .fill(0)
-    // .map((_, i) => ({
-    //   id: i,
-    //   title: `Item ${i + 1}`,
-    // }));
-
-    // console.log(fakeData);
-    // console.log(claims);
-    claims = claims.map((_, i) => ({
+    // Markdown requires shielding these symbols
+    claims = claims.map((claim, i) => ({
       id: i,
       title: `Item ${i + 1}`,
+      claim: claim
+        .replace(/\_/g, '\\_')
+        // .replace(/\*/g, '\\*')
+        .replace(/\[/g, '\\[')
+        .replace(/\]/g, '\\]')
+        .replace(/\(/g, '\\(')
+        .replace(/\)/g, '\\)')
+        .replace(/\~/g, '\\~')
+        .replace(/\`/g, '\\`')
+        .replace(/\>/g, '\\>')
+        .replace(/\#/g, '\\#')
+        .replace(/\+/g, '\\+')
+        .replace(/\-/g, '\\-')
+        .replace(/\=/g, '\\=')
+        .replace(/\|/g, '\\|')
+        .replace(/\{/g, '\\{')
+        .replace(/\}/g, '\\}')
+        .replace(/\./g, '\\.')
+        .replace(/\!/g, '\\!'),
     }));
 
     const paginator = new Pagination({
       data: claims,
+      header: () => ``,
       isEnabledDeleteButton: false,
-      format: (item) => `${item}`,
+      format: (item) => `${item.claim}`,
       pageSize: 1,
       messages: {
         firstPage: '<<',
@@ -393,13 +392,21 @@ export class ClaimsService {
         next: '>',
       },
     });
+
     const text = await paginator.text();
-    keyboard = await paginator.keyboard();
-    context.reply(text, keyboard);
+    const paginatorKeyboard = await paginator.keyboard();
 
-    // console.log(paginator);
+    console.log(paginatorKeyboard.reply_markup.inline_keyboard);
 
-    // console.log(page);
+    keyboard.push(paginatorKeyboard.reply_markup.inline_keyboard[0]);
+    keyboard.push(paginatorKeyboard.reply_markup.inline_keyboard[1]);
+    console.log(keyboard);
+    replyMarkup = Markup.inlineKeyboard(keyboard);
+
+    context.reply(text, {
+      reply_markup: replyMarkup.reply_markup,
+      parse_mode: 'MarkdownV2',
+    });
 
     paginator.handleActions(this.bot);
 
