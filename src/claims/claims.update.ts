@@ -1,4 +1,4 @@
-import { Action, Ctx, Hears, Help, On, Start, Update } from 'nestjs-telegraf';
+import { Action, Ctx, Hears, Help, Start, Update } from 'nestjs-telegraf';
 import { Context } from 'src/interfaces/context.interface';
 import { ClaimsService } from './claims.service';
 
@@ -11,23 +11,43 @@ export class ClaimsUpdate {
     await this.claimsService.getShortClaims(ctx);
   }
 
+  @Hears(/start/)
+  async hearsStart(@Ctx() ctx: Context) {
+    await this.claimsService.getShortClaims(ctx);
+  }
+
+  @Action(/^getShortClaims/)
+  async getShortClaims(@Ctx() ctx: Context) {
+    await this.claimsService.getShortClaims(ctx);
+  }
+
   @Help()
   async help(@Ctx() ctx: Context) {
     await this.claimsService.help(ctx);
   }
 
-  @On('sticker')
-  async on(@Ctx() ctx: Context) {
-    await ctx.reply('👍');
+  @Hears(/help/)
+  async hearsHelp(@Ctx() ctx: Context) {
+    await this.claimsService.help(ctx);
   }
 
-  @Action('getShortClaims')
-  async getShortClaims(@Ctx() ctx: Context) {
-    await this.claimsService.getShortClaims(ctx);
+  @Action(/^clgt_/)
+  async getClaim(@Ctx() ctx: Context) {
+    await this.claimsService.getClaim(ctx);
   }
 
-  @Hears('hi')
-  async hears(@Ctx() ctx: Context) {
-    await ctx.reply('Hey there');
+  @Hears(/clgt/)
+  async hearsClaim(@Ctx() ctx: Context) {
+    await this.claimsService.getClaim(ctx);
   }
+
+  @Hears('get_list')
+  async getList(@Ctx() ctx: Context) {
+    await this.claimsService.getListClaims(ctx);
+  }
+
+  // @On('sticker')
+  // async on(@Ctx() ctx: Context) {
+  //   await ctx.reply('👍');
+  // }
 }

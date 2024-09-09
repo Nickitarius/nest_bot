@@ -2,12 +2,18 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { AxiosError } from 'axios';
 import { catchError, firstValueFrom } from 'rxjs';
-import { Context, Markup } from 'telegraf';
+import { Context, Markup, Telegraf } from 'telegraf';
 import { v4 as uuidV4 } from 'uuid';
+import * as fs from 'fs';
+import { Pagination } from 'telegraf-pagination';
+import { InjectBot } from 'nestjs-telegraf';
 
 @Injectable()
 export class ClaimsService {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    @InjectBot() private bot: Telegraf<Context>,
+  ) {}
   private readonly logger = new Logger(ClaimsService.name);
 
   echo(text: string): string {
@@ -169,5 +175,240 @@ export class ClaimsService {
     const replyMarkup = Markup.inlineKeyboard(keyboard);
 
     await context.reply(page, replyMarkup);
+  }
+
+  async getListClaims(context: Context) {
+    // console.log(context);
+
+    const uuidOne = uuidV4();
+
+    let user, query;
+    try {
+      query = context.callbackQuery;
+      user = query.from;
+    } catch {
+      query = context.update?.['message'];
+      user = query.from;
+    }
+
+    const apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims?uid=${user.id}`;
+    const requestConfig = {
+      auth: {
+        username: process.env.API_USER,
+        password: process.env.API_PASS,
+      },
+    };
+
+    let response;
+    let keyboard, replyMarkup;
+
+    let data;
+    if (process.argv.includes('dev')) {
+      this.logger.log(
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update)}\n####Update END####`,
+      );
+      data = JSON.parse(fs.readFileSync('data/data.json', 'utf-8'));
+    } else {
+      try {
+        this.logger.log(`${user.id}(${user.username}) Request ${apiClaims}`);
+
+        response = await firstValueFrom(
+          this.httpService.get(apiClaims, requestConfig).pipe(
+            catchError((error: AxiosError) => {
+              throw error.response.data;
+            }),
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `UUID: ${uuidOne} USER_ID: ${user.id} CODE: ${error.statusCode} DATA: ${JSON.stringify(error)}`,
+        );
+
+        keyboard = [
+          Markup.button.callback('Попробовать снова', 'getShortClaims'),
+        ];
+        replyMarkup = Markup.inlineKeyboard(keyboard);
+
+        try {
+          await context.editMessageText(
+            `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
+            replyMarkup,
+          );
+        } catch {
+          await context.reply(
+            `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
+            replyMarkup,
+          );
+        }
+
+        return;
+      }
+      data = response.data;
+    }
+
+    let page;
+    // let tmpHead;
+    let tmp_claim;
+    let claims = [];
+
+    if (data.length != 0) {
+      const total = data.claims.length;
+      const tmpHead = `***Список Заявок***
+*Общее количество*:  ${total}
+==========================`;
+
+      // let newClaims = 0;
+      // let takenWork = 0;
+      // let assigned = null;
+      let claimsNo = [];
+      const claimsKey = [];
+
+      keyboard = [];
+      page = tmpHead;
+      let i = 0;
+
+      data.claims.forEach((claim) => {
+        // claim = {
+        //   id: claim.id,
+        //   claim_no: claim.claim_no,
+        //   claim_date: claim.claim_date,
+        //   is_service: claim.is_service,
+        //   client_contract: claim.client_contract,
+        //   client_name: claim.client_name,
+        //   claim_phone: claim.claim_phone,
+        //   claim_addr: claim.claim_addr,
+        //   autor: claim.autor,
+        //   assigned: claim.assigned,
+        //   comment: claim.comment,
+        //   work_commentary: claim.work_commentary,
+        //   lw_date_change: claim.lw_date_change,
+        //   status_name: claim.status_name,
+        // };
+
+        claim.claim_addr = claim.claim_addr.replaceAll('_', '-');
+        claim.claim_date = claim.claim_date.replaceAll('_', '-');
+        claim.client_contract = claim.client_contract.replaceAll('_', '-');
+        claim.client_name = claim.client_name.replaceAll('_', '-');
+        claim.claim_phone = claim.claim_phone.replaceAll('_', '-');
+        claim.autor = claim.autor.replaceAll('_', '-');
+        claim.assigned = claim.assigned.replaceAll('_', '-');
+        claim.comment = claim.comment.replaceAll('_', '-');
+
+        if (claim.work_commentary != undefined) {
+          claim.work_commentary = claim.work_commentary.replaceAll('_', '-');
+        }
+        if (claim.status_name != undefined) {
+          claim.status_name = claim.status_name.replaceAll('_', '-');
+        }
+
+        claimsNo.push(claim.claim_no);
+
+        // page =
+        tmp_claim = `*Обращениe №:* ${claim.claim_no}
+        *Статус:* ${claim.status_name}
+        *Дата:* ${claim.claim_date}
+        *Договор:* ${claim.client_contract}
+        *Телефон:* ${claim.claim_phone}
+        *Имя:* ${claim.client_name}
+        *Адрес:* ${claim.claim_addr}
+        *Инициатор:* ${claim.autor}
+        *Исполнитель:* ${claim.assigned}
+        *Комментарий к заявке:* ${claim.comment}
+        *Комментарий к работе:* ${claim.work_commentary}
+  
+        `;
+        page += tmp_claim;
+
+        i += 1;
+
+        if (i >= 3) {
+          claims.push(page);
+          claimsKey.push([claimsNo[0], claimsNo[1], claimsNo[2]]);
+          page = tmpHead;
+          i = 0;
+          claimsNo = [];
+        }
+
+        // keyboard.push([
+        //   Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
+        // ]);
+      });
+
+      if (page != '' && claimsNo.length != 0) {
+        claims.push(page);
+        if (claimsNo.length == 2) {
+          claimsKey.push([claimsNo[0], claimsNo[1]]);
+        } else {
+          claimsKey.push([claimsNo[0]]);
+        }
+      }
+    } else {
+      this.logger.log(
+        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
+      );
+
+      keyboard = [
+        Markup.button.callback('Попробовать снова', 'getShortClaims'),
+      ];
+      replyMarkup = Markup.inlineKeyboard(keyboard);
+
+      try {
+        await context.editMessageText(
+          `Для вас нет заявок :(\n\nUUID: ${uuidOne}\nUserID: ${user.id}`,
+          { parse_mode: 'MarkdownV2', reply_markup: replyMarkup.reply_markup },
+        );
+      } catch {
+        await context.reply(
+          `Для вас нет заявок :(\n\nUUID: ${uuidOne}\nUserID: ${user.id}`,
+          { parse_mode: 'MarkdownV2', reply_markup: replyMarkup.reply_markup },
+        );
+      }
+
+      return;
+    }
+
+    // const fakeData = Array(10)
+    //   .fill(0)
+    // .map((_, i) => ({
+    //   id: i,
+    //   title: `Item ${i + 1}`,
+    // }));
+
+    // console.log(fakeData);
+    // console.log(claims);
+    claims = claims.map((_, i) => ({
+      id: i,
+      title: `Item ${i + 1}`,
+    }));
+
+    const paginator = new Pagination({
+      data: claims,
+      isEnabledDeleteButton: false,
+      format: (item) => `${item}`,
+      pageSize: 1,
+      messages: {
+        firstPage: '<<',
+        lastPage: '>>',
+        prev: '<',
+        next: '>',
+      },
+    });
+    const text = await paginator.text();
+    keyboard = await paginator.keyboard();
+    context.reply(text, keyboard);
+
+    // console.log(paginator);
+
+    // console.log(page);
+
+    paginator.handleActions(this.bot);
+
+    if (data.claims.length == 1) {
+    } else {
+    }
+  }
+
+  async getClaim(context: Context) {
+    console.log(context);
   }
 }
