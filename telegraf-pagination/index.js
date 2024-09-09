@@ -6,6 +6,7 @@ class Pagination {
     next: '➡️',
     delete: '❌',
     indexKey: 'order',
+    currentPageIndicator: 'Pg',
   };
 
   constructor({
@@ -22,7 +23,6 @@ class Pagination {
     },
     isEnabledDeleteButton = true,
     inlineCustomButtons = null,
-    parse_mode = 'HTML',
     onSelect = () => {},
     format = (item, index) => `${index + 1}. ${item}`,
     header = (currentPage, pageSize, total) =>
@@ -30,6 +30,8 @@ class Pagination {
         currentPage * pageSize <= total ? currentPage * pageSize : total
       } of ${total}`,
     messages = this.defaultMessages,
+    parse_mode = 'HTML',
+    isPageButtons = false,
   }) {
     this.lazy = lazy;
     if (!this.lazy && Array.isArray(data)) {
@@ -86,8 +88,10 @@ class Pagination {
     this.currentItems = [];
 
     this.parse_mode = parse_mode;
+    this.isPageButtons = isPageButtons;
   }
 
+  /**Returns text of a page. */
   async text() {
     let items = [];
 
@@ -173,17 +177,30 @@ class Pagination {
 
         let button = getButton(buttonText, `${this._callbackStr}-${i}`);
 
-        console.log(button);
-
         row.push(button);
       }
     }
 
     keyboard.push(row);
-    row = [];
 
     // Pagination Controls
     if (this.totalPages > 1) {
+      if (this.isPageButtons && this.totalPages > 1) {
+        row = [];
+        let text;
+        for (let i = 0; i < this.totalPages; i++) {
+          if (i + 1 == this.currentPage) {
+            text = `${this.messages.currentPageIndicator} ${i + 1}`;
+          } else {
+            text = i + 1;
+          }
+          row.push(getButton(text, `${this._callbackStr}-page_${i}`));
+        }
+        keyboard.push(row);
+      }
+
+      row = [];
+
       row.push(getButton(this.messages.prev, `${this._callbackStr}-prev`));
       if (this.isEnabledDeleteButton) {
         row.push(
@@ -201,6 +218,8 @@ class Pagination {
     ) {
       keyboard.push(...this.inlineCustomButtons);
     }
+
+    console.log(keyboard);
 
     // Give ready-to-use Telegra Markup object
     return {
@@ -242,7 +261,18 @@ class Pagination {
           await ctx.deleteMessage();
           break;
         default:
-          this.onSelect(this.currentItems[data], parseInt(data) + 1, ctx);
+          if (/^page_/.test(data)) {
+            this.currentPage = parseInt(data.replace('page_', ''));
+            this.currentPage = this.currentPage + 1;
+            text = await this.text();
+            keyboard = await this.keyboard();
+            await ctx.editMessageText(text, {
+              ...keyboard,
+              parse_mode: this.parse_mode,
+            });
+          } else {
+            this.onSelect(this.currentItems[data], parseInt(data) + 1, ctx);
+          }
       }
       return await ctx.answerCbQuery();
     });

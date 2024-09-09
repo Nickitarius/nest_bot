@@ -9,7 +9,8 @@ import { Pagination } from '../../telegraf-pagination';
 import { InjectBot } from 'nestjs-telegraf';
 // import { inlineKeyboard } from 'telegraf/typings/markup';
 
-/*Returns string with all characters incompatible
+/**
+ * Returns string with all characters incompatible
  with Telegram's MarkdonwnV2 shielded.*/
 function getMarkdownV2Shielded(string: string): string {
   return (
@@ -275,28 +276,13 @@ export class ClaimsService {
       data = response.data;
     }
 
-    let page;
-    // let tmpHead;
     let tmpClaim;
-    // let pages = [];
     let claims = [];
     const total = data.claims.length;
-    let claimsNumbers = [];
+    const claimsNumbers = [];
 
     if (data.length != 0) {
-      //       const tmpHead = `***Список Заявок***
-      // *Общее количество*:  ${total}
-      // ==========================\n`; //.replaceAll('=', '\\=');
-
-      // let newClaims = 0;
-      // let takenWork = 0;
-      // let assigned = null;
-      let claimsNo = [];
-      const claimsKey = [];
-
       keyboard = [[]];
-      // page = tmpHead;
-      let i = 0;
 
       data.claims.forEach((claim) => {
         claim.claim_addr = claim.claim_addr.replaceAll('_', '-');
@@ -315,7 +301,6 @@ export class ClaimsService {
           claim.status_name = claim.status_name.replaceAll('_', '-');
         }
 
-        claimsNo.push(claim.claim_no);
         claimsNumbers.push(claim.claim_no);
 
         tmpClaim = `*Обращениe №:* ${claim.claim_no}
@@ -331,33 +316,9 @@ export class ClaimsService {
 *Комментарий к работе:* ${claim.work_commentary}
 
 `;
-        page += tmpClaim;
 
         claims.push(getMarkdownV2Shielded(tmpClaim));
-
-        i += 1;
-
-        if (i >= 3) {
-          // pages.push(page);
-          claimsKey.push([claimsNo[0], claimsNo[1], claimsNo[2]]);
-          page = '';
-          i = 0;
-          claimsNo = [];
-        }
-
-        keyboard[0].push(
-          Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
-        );
       });
-
-      if (page != '' && claimsNo.length != 0) {
-        // pages.push(page);
-        if (claimsNo.length == 2) {
-          claimsKey.push([claimsNo[0], claimsNo[1]]);
-        } else {
-          claimsKey.push([claimsNo[0]]);
-        }
-      }
     } else {
       this.logger.log(
         `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
@@ -387,13 +348,6 @@ export class ClaimsService {
 *Общее количество*:  ${total}
 ==========================\n`.replaceAll('=', '\\=');
 
-    // Markdown requires shielding these symbols
-    // pages = pages.map((page, i) => ({
-    //   id: i,
-    //   title: `Item ${i + 1}`,
-    //   claim: getMarkdownV2Shielded(page),
-    // }));
-
     claims = claims.map((claim, i) => ({
       id: i,
       title: claimsNumbers[i],
@@ -412,15 +366,14 @@ export class ClaimsService {
         prev: '<',
         next: '>',
         indexKey: 'title',
+        currentPageIndicator: 'Стр',
       },
       // onSelect: (item, index) => {
       //   console.log(index);
       //   // context.reply
       // }, // optional. Default value: empty function
       parse_mode: 'MarkdownV2',
-      // inlineCustomButtons: [
-      //   Markup.button.callback('Title custom button', 'your_callback_name'),
-      // ], // optional. Default value: null
+      isPageButtons: true,
     });
 
     const text = await paginator.text();
