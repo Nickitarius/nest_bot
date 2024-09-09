@@ -5,7 +5,7 @@ import { catchError, firstValueFrom } from 'rxjs';
 import { Context, Markup, Telegraf } from 'telegraf';
 import { v4 as uuidV4 } from 'uuid';
 import * as fs from 'fs';
-import { Pagination } from 'telegraf-pagination';
+import { Pagination } from '../../telegraf-pagination';
 import { InjectBot } from 'nestjs-telegraf';
 // import { inlineKeyboard } from 'telegraf/typings/markup';
 
@@ -253,12 +253,12 @@ export class ClaimsService {
     // let tmpHead;
     let tmpClaim;
     let claims = [];
+    const total = data.claims.length;
 
     if (data.length != 0) {
-      const total = data.claims.length;
-      const tmpHead = `***Список Заявок***
-*Общее количество*:  ${total}
-==========================\n`; //.replaceAll('=', '\\=');
+      //       const tmpHead = `***Список Заявок***
+      // *Общее количество*:  ${total}
+      // ==========================\n`; //.replaceAll('=', '\\=');
 
       // let newClaims = 0;
       // let takenWork = 0;
@@ -266,8 +266,8 @@ export class ClaimsService {
       let claimsNo = [];
       const claimsKey = [];
 
-      keyboard = [];
-      page = tmpHead;
+      keyboard = [[]];
+      // page = tmpHead;
       let i = 0;
 
       data.claims.forEach((claim) => {
@@ -303,7 +303,6 @@ export class ClaimsService {
 
 `;
 
-        // tmpClaim = tmpClaim.replaceAll('-', '\\-');
         page += tmpClaim;
 
         i += 1;
@@ -311,14 +310,14 @@ export class ClaimsService {
         if (i >= 3) {
           claims.push(page);
           claimsKey.push([claimsNo[0], claimsNo[1], claimsNo[2]]);
-          page = tmpHead;
+          page = '';
           i = 0;
           claimsNo = [];
         }
 
-        keyboard.push([
+        keyboard[0].push(
           Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
-        ]);
+        );
       });
 
       if (page != '' && claimsNo.length != 0) {
@@ -354,6 +353,10 @@ export class ClaimsService {
       return;
     }
 
+    const tmpHead = `***Список Заявок***
+*Общее количество*:  ${total}
+==========================\n`.replaceAll('=', '\\=');
+
     // Markdown requires shielding these symbols
     claims = claims.map((claim, i) => ({
       id: i,
@@ -381,29 +384,25 @@ export class ClaimsService {
 
     const paginator = new Pagination({
       data: claims,
-      header: () => ``,
+      header: () => tmpHead,
       isEnabledDeleteButton: false,
       format: (item) => `${item.claim}`,
       pageSize: 1,
       messages: {
-        firstPage: '<<',
-        lastPage: '>>',
         prev: '<',
         next: '>',
       },
+      parse_mode: 'MarkdownV2',
     });
 
     const text = await paginator.text();
     const paginatorKeyboard = await paginator.keyboard();
 
-    console.log(paginatorKeyboard.reply_markup.inline_keyboard);
-
     keyboard.push(paginatorKeyboard.reply_markup.inline_keyboard[0]);
     keyboard.push(paginatorKeyboard.reply_markup.inline_keyboard[1]);
-    console.log(keyboard);
     replyMarkup = Markup.inlineKeyboard(keyboard);
 
-    context.reply(text, {
+    await context.reply(text, {
       reply_markup: replyMarkup.reply_markup,
       parse_mode: 'MarkdownV2',
     });
