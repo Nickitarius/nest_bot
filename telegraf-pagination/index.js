@@ -172,6 +172,9 @@ class Pagination {
         }
 
         let button = getButton(buttonText, `${this._callbackStr}-${i}`);
+
+        console.log(button);
+
         row.push(button);
       }
     }

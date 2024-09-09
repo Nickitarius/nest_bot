@@ -9,6 +9,32 @@ import { Pagination } from '../../telegraf-pagination';
 import { InjectBot } from 'nestjs-telegraf';
 // import { inlineKeyboard } from 'telegraf/typings/markup';
 
+/*Returns string with all characters incompatible
+ with Telegram's MarkdonwnV2 shielded.*/
+function getMarkdownV2Shielded(string: string): string {
+  return (
+    string
+      .replace(/\_/g, '\\_')
+      // .replace(/\*/g, '\\*')
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      .replace(/\~/g, '\\~')
+      .replace(/\`/g, '\\`')
+      .replace(/\>/g, '\\>')
+      .replace(/\#/g, '\\#')
+      .replace(/\+/g, '\\+')
+      .replace(/\-/g, '\\-')
+      .replace(/\=/g, '\\=')
+      .replace(/\|/g, '\\|')
+      .replace(/\{/g, '\\{')
+      .replace(/\}/g, '\\}')
+      .replace(/\./g, '\\.')
+      .replace(/\!/g, '\\!')
+  );
+}
+
 @Injectable()
 export class ClaimsService {
   constructor(
@@ -108,11 +134,11 @@ export class ClaimsService {
         if (assigned == null) {
           assigned = claim.assigned;
         }
-
-        keyboard.push([
-          Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
-        ]);
       });
+
+      // keyboard.push([
+      //   Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
+      // ]);
 
       page = `***Список Заявок***
 *Общее количество*:  ${total}
@@ -252,8 +278,10 @@ export class ClaimsService {
     let page;
     // let tmpHead;
     let tmpClaim;
+    // let pages = [];
     let claims = [];
     const total = data.claims.length;
+    let claimsNumbers = [];
 
     if (data.length != 0) {
       //       const tmpHead = `***Список Заявок***
@@ -288,6 +316,7 @@ export class ClaimsService {
         }
 
         claimsNo.push(claim.claim_no);
+        claimsNumbers.push(claim.claim_no);
 
         tmpClaim = `*Обращениe №:* ${claim.claim_no}
 *Статус:* ${claim.status_name}
@@ -302,13 +331,14 @@ export class ClaimsService {
 *Комментарий к работе:* ${claim.work_commentary}
 
 `;
-
         page += tmpClaim;
+
+        claims.push(getMarkdownV2Shielded(tmpClaim));
 
         i += 1;
 
         if (i >= 3) {
-          claims.push(page);
+          // pages.push(page);
           claimsKey.push([claimsNo[0], claimsNo[1], claimsNo[2]]);
           page = '';
           i = 0;
@@ -321,7 +351,7 @@ export class ClaimsService {
       });
 
       if (page != '' && claimsNo.length != 0) {
-        claims.push(page);
+        // pages.push(page);
         if (claimsNo.length == 2) {
           claimsKey.push([claimsNo[0], claimsNo[1]]);
         } else {
@@ -358,28 +388,16 @@ export class ClaimsService {
 ==========================\n`.replaceAll('=', '\\=');
 
     // Markdown requires shielding these symbols
+    // pages = pages.map((page, i) => ({
+    //   id: i,
+    //   title: `Item ${i + 1}`,
+    //   claim: getMarkdownV2Shielded(page),
+    // }));
+
     claims = claims.map((claim, i) => ({
       id: i,
-      title: `Item ${i + 1}`,
-      claim: claim
-        .replace(/\_/g, '\\_')
-        // .replace(/\*/g, '\\*')
-        .replace(/\[/g, '\\[')
-        .replace(/\]/g, '\\]')
-        .replace(/\(/g, '\\(')
-        .replace(/\)/g, '\\)')
-        .replace(/\~/g, '\\~')
-        .replace(/\`/g, '\\`')
-        .replace(/\>/g, '\\>')
-        .replace(/\#/g, '\\#')
-        .replace(/\+/g, '\\+')
-        .replace(/\-/g, '\\-')
-        .replace(/\=/g, '\\=')
-        .replace(/\|/g, '\\|')
-        .replace(/\{/g, '\\{')
-        .replace(/\}/g, '\\}')
-        .replace(/\./g, '\\.')
-        .replace(/\!/g, '\\!'),
+      title: claimsNumbers[i],
+      claim: claim,
     }));
 
     const paginator = new Pagination({
@@ -387,12 +405,22 @@ export class ClaimsService {
       header: () => tmpHead,
       isEnabledDeleteButton: false,
       format: (item) => `${item.claim}`,
-      pageSize: 1,
+      pageSize: 3,
       messages: {
+        firstPage: '<<',
+        lastPage: '>>',
         prev: '<',
         next: '>',
+        indexKey: 'title',
       },
+      // onSelect: (item, index) => {
+      //   console.log(index);
+      //   // context.reply
+      // }, // optional. Default value: empty function
       parse_mode: 'MarkdownV2',
+      // inlineCustomButtons: [
+      //   Markup.button.callback('Title custom button', 'your_callback_name'),
+      // ], // optional. Default value: null
     });
 
     const text = await paginator.text();
@@ -400,10 +428,10 @@ export class ClaimsService {
 
     keyboard.push(paginatorKeyboard.reply_markup.inline_keyboard[0]);
     keyboard.push(paginatorKeyboard.reply_markup.inline_keyboard[1]);
-    replyMarkup = Markup.inlineKeyboard(keyboard);
+    replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
     await context.reply(text, {
-      reply_markup: replyMarkup.reply_markup,
+      reply_markup: replyMarkup,
       parse_mode: 'MarkdownV2',
     });
 
