@@ -31,7 +31,8 @@ class Pagination {
       } of ${total}`,
     messages = this.defaultMessages,
     parse_mode = 'HTML',
-    isPageButtons = false,
+    isEnablePageButtons = false,
+    isEnableItemButtons = true,
   }) {
     this.lazy = lazy;
     if (!this.lazy && Array.isArray(data)) {
@@ -88,7 +89,8 @@ class Pagination {
     this.currentItems = [];
 
     this.parse_mode = parse_mode;
-    this.isPageButtons = isPageButtons;
+    this.isEnablePageButtons = isEnablePageButtons;
+    this.isEnableItemButtons = isEnableItemButtons;
   }
 
   /**Returns text of a page. */
@@ -131,53 +133,55 @@ class Pagination {
 
     let row = [];
 
-    if (this.isButtonsMode === false) {
-      // Pagination buttons
-      for (let i = 0; i < items.length; i++) {
-        if (0 === i % this.rowSize && row.length) {
-          keyboard.push(row);
-          row = [];
+    if (this.isEnableItemButtons) {
+      if (this.isButtonsMode === false) {
+        // Pagination buttons
+        for (let i = 0; i < items.length; i++) {
+          if (0 === i % this.rowSize && row.length) {
+            keyboard.push(row);
+            row = [];
+          }
+          let item = items[i];
+          if (this.messages.indexKey === 'order') {
+            item.order = i + 1;
+          }
+          let button = getButton(
+            item[this.messages.indexKey],
+            `${this._callbackStr}-${i}`,
+          );
+          row.push(button);
         }
-        let item = items[i];
-        if (this.messages.indexKey === 'order') {
-          item.order = i + 1;
-        }
-        let button = getButton(
-          item[this.messages.indexKey],
-          `${this._callbackStr}-${i}`,
-        );
-        row.push(button);
-      }
-    } else {
-      // Need to display the title from an associative array?...
-      let { isSimpleArray, title } = this.buttonModeOptions;
+      } else {
+        // Need to display the title from an associative array?...
+        let { isSimpleArray, title } = this.buttonModeOptions;
 
-      if (isSimpleArray) {
-        title = 0;
-      }
-
-      // Pagination buttons
-      for (let i = 0; i < items.length; i++) {
-        if (0 === i % 1 && row.length) {
-          keyboard.push(row);
-          row = [];
+        if (isSimpleArray) {
+          title = 0;
         }
 
-        let currentItem = items[i];
-        let buttonText;
-        if (typeof title === 'function') {
-          buttonText = title(currentItem, i);
-        } else {
-          buttonText =
-            typeof currentItem[title] !== 'undefined' &&
-            (currentItem[title] !== ''
-              ? currentItem[title]
-              : `Element #${i + 1}`);
+        // Pagination buttons
+        for (let i = 0; i < items.length; i++) {
+          if (0 === i % 1 && row.length) {
+            keyboard.push(row);
+            row = [];
+          }
+
+          let currentItem = items[i];
+          let buttonText;
+          if (typeof title === 'function') {
+            buttonText = title(currentItem, i);
+          } else {
+            buttonText =
+              typeof currentItem[title] !== 'undefined' &&
+              (currentItem[title] !== ''
+                ? currentItem[title]
+                : `Element #${i + 1}`);
+          }
+
+          let button = getButton(buttonText, `${this._callbackStr}-${i}`);
+
+          row.push(button);
         }
-
-        let button = getButton(buttonText, `${this._callbackStr}-${i}`);
-
-        row.push(button);
       }
     }
 
@@ -185,7 +189,7 @@ class Pagination {
 
     // Pagination Controls
     if (this.totalPages > 1) {
-      if (this.isPageButtons && this.totalPages > 1) {
+      if (this.isEnablePageButtons && this.totalPages > 1) {
         row = [];
         let text;
         for (let i = 0; i < this.totalPages; i++) {
@@ -218,8 +222,6 @@ class Pagination {
     ) {
       keyboard.push(...this.inlineCustomButtons);
     }
-
-    console.log(keyboard);
 
     // Give ready-to-use Telegra Markup object
     return {

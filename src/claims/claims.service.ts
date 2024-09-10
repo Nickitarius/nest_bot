@@ -137,16 +137,12 @@ export class ClaimsService {
         }
       });
 
-      // keyboard.push([
-      //   Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`),
-      // ]);
-
-      page = `***Список Заявок***
-*Общее количество*:  ${total}
-*Новых*: ${newClaims}
-*В работе*: ${takenWork}
-      
-*Исполнитель*: ${assigned}`;
+      page =
+        `***Список Заявок***\n` +
+        `*Общее количество*:  ${total}\n` +
+        `*Новых*: ${newClaims}\n` +
+        `*В работе*: ${takenWork}\n\n` +
+        `*Исполнитель*: ${assigned}`;
     } else {
       this.logger.log(
         `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
@@ -174,8 +170,6 @@ export class ClaimsService {
 
     replyMarkup = Markup.inlineKeyboard(keyboard);
 
-    console.log(replyMarkup.reply_markup);
-
     try {
       await context.editMessageText(page, {
         reply_markup: replyMarkup.reply_markup,
@@ -192,12 +186,13 @@ export class ClaimsService {
   }
 
   async help(context: Context) {
-    const page = `Help
-1. Бери заявку в работу.
-2. Закрывай или возвращай обратно.
-3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.
-4. Можно по заявке узнать логин\\пароль для PPPOE.
-5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
+    const page =
+      `Help\n` +
+      `1. Бери заявку в работу.\n` +
+      `2. Закрывай или возвращай обратно.\n` +
+      `3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.\n` +
+      `4. Можно по заявке узнать логин\\пароль для PPPOE.\n` +
+      `5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
 
     const keyboard = [
       Markup.button.callback('Загрузить заявки', 'getShortClaims'),
@@ -207,9 +202,8 @@ export class ClaimsService {
     await context.reply(page, replyMarkup);
   }
 
+  /**Replies with a paginator containing all claims.*/
   async getListClaims(context: Context) {
-    // console.log(context);
-
     const uuidOne = uuidV4();
 
     let user, query;
@@ -237,7 +231,9 @@ export class ClaimsService {
       this.logger.log(
         `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update)}\n####Update END####`,
       );
-      data = JSON.parse(fs.readFileSync('data/data.json', 'utf-8'));
+      data = JSON.parse(
+        fs.readFileSync('data/data_just_one_entry.json', 'utf-8'), //data_just_one_entry
+      );
     } else {
       try {
         this.logger.log(`${user.id}(${user.username}) Request ${apiClaims}`);
@@ -276,13 +272,13 @@ export class ClaimsService {
       data = response.data;
     }
 
-    let tmpClaim;
     let claims = [];
     const total = data.claims.length;
     const claimsNumbers = [];
 
     if (data.length != 0) {
-      keyboard = [[]];
+      keyboard = [];
+      let tmpClaim;
 
       data.claims.forEach((claim) => {
         claim.claim_addr = claim.claim_addr.replaceAll('_', '-');
@@ -303,19 +299,18 @@ export class ClaimsService {
 
         claimsNumbers.push(claim.claim_no);
 
-        tmpClaim = `*Обращениe №:* ${claim.claim_no}
-*Статус:* ${claim.status_name}
-*Дата:* ${claim.claim_date}
-*Договор:* ${claim.client_contract}
-*Телефон:* ${claim.claim_phone}
-*Имя:* ${claim.client_name}
-*Адрес:* ${claim.claim_addr}
-*Инициатор:* ${claim.autor}
-*Исполнитель:* ${claim.assigned}
-*Комментарий к заявке:* ${claim.comment}
-*Комментарий к работе:* ${claim.work_commentary}
-
-`;
+        tmpClaim =
+          `*Обращениe №:* ${claim.claim_no}\n` +
+          `*Статус:* ${claim.status_name}\n` +
+          `*Дата:* ${claim.claim_date}\n` +
+          `*Договор:* ${claim.client_contract}\n` +
+          `*Телефон:* ${claim.claim_phone}\n` +
+          `*Имя:* ${claim.client_name}\n` +
+          `*Адрес:* ${claim.claim_addr}\n` +
+          `*Инициатор:* ${claim.autor}\n` +
+          `*Исполнитель:* ${claim.assigned}\n` +
+          `*Комментарий к заявке:* ${claim.comment}\n` +
+          `*Комментарий к работе:* ${claim.work_commentary}\n\n`;
 
         claims.push(getMarkdownV2Shielded(tmpClaim));
       });
@@ -344,13 +339,14 @@ export class ClaimsService {
       return;
     }
 
-    const tmpHead = `***Список Заявок***
-*Общее количество*:  ${total}
-==========================\n`.replaceAll('=', '\\=');
+    const tmpHead =
+      `***Список Заявок***\n` +
+      `*Общее количество*:  ${total}\n` +
+      `==========================\n`.replaceAll('=', '\\=');
 
     claims = claims.map((claim, i) => ({
       id: i,
-      title: claimsNumbers[i],
+      claimNo: claimsNumbers[i],
       claim: claim,
     }));
 
@@ -365,37 +361,89 @@ export class ClaimsService {
         lastPage: '>>',
         prev: '<',
         next: '>',
-        indexKey: 'title',
+        indexKey: 'claimNo',
         currentPageIndicator: 'Стр',
       },
-      // onSelect: (item, index) => {
-      //   console.log(index);
-      //   // context.reply
-      // }, // optional. Default value: empty function
+      onSelect: (item) => {
+        this.getClaim(context, item.claimNo);
+      },
       parse_mode: 'MarkdownV2',
-      isPageButtons: true,
+      inlineCustomButtons: [[Markup.button.callback('Выход', 'cancel')]],
+      isEnablePageButtons: true,
     });
+
+    const customButtons = [];
+
+    if (data.claims.length == 1) {
+      paginator.isEnableItemButtons = false;
+
+      let claim = data.claims[0];
+      claim ??= 666;
+      switch (claim.id) {
+        case 10:
+        case 20:
+          customButtons.push([
+            Markup.button.callback(
+              'В работу',
+              `cl_action_takework_${claim.id}_${claim.claim_no}_${claim.claim_phone}`,
+            ),
+          ]);
+          break;
+        case 666:
+          this.logger.warn(
+            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data)}`,
+          );
+          break;
+        default:
+          keyboard.push([
+            Markup.button.callback(
+              'SMS о недозвоне',
+              `cl_action_senddefsms_${user.id}_${user.username}_${user.claim_phone}`,
+            ),
+          ]);
+          keyboard.push([
+            Markup.button.callback(
+              'Закрыть заявку',
+              `cl_action_complete_${user.id}_${user.username}_${user.claim_phone}`,
+            ),
+            Markup.button.callback(
+              'Вернуть заявку',
+              `cl_action_return_${user.id}_${user.username}_${user.claim_phone}`,
+            ),
+          ]);
+      }
+    }
+
+    customButtons.push([Markup.button.callback('Выход', 'cancel')]);
+
+    paginator.inlineCustomButtons = customButtons;
 
     const text = await paginator.text();
     const paginatorKeyboard = await paginator.keyboard();
 
-    keyboard.push(paginatorKeyboard.reply_markup.inline_keyboard[0]);
-    keyboard.push(paginatorKeyboard.reply_markup.inline_keyboard[1]);
-    replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
-
-    await context.reply(text, {
-      reply_markup: replyMarkup,
-      parse_mode: 'MarkdownV2',
+    paginatorKeyboard.reply_markup.inline_keyboard.forEach((item) => {
+      keyboard.push(item);
     });
 
-    paginator.handleActions(this.bot);
+    replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
-    if (data.claims.length == 1) {
-    } else {
+    try {
+      await context.editMessageText(text, {
+        reply_markup: replyMarkup,
+        parse_mode: 'MarkdownV2',
+      });
+    } catch {
+      await context.reply(text, {
+        reply_markup: replyMarkup,
+        parse_mode: 'MarkdownV2',
+      });
     }
+
+    paginator.handleActions(this.bot);
   }
 
-  async getClaim(context: Context) {
-    console.log(context);
+  async getClaim(context: Context, claimNo: number) {
+    console.log(claimNo);
+    // console.log(context);
   }
 }

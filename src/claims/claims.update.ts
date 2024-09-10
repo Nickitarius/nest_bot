@@ -33,12 +33,13 @@ export class ClaimsUpdate {
 
   @Action(/^clgt_/)
   async getClaim(@Ctx() ctx: Context) {
-    await this.claimsService.getClaim(ctx);
+    // console.log(context);
+    await this.claimsService.getClaim(ctx, 1);
   }
 
   @Hears(/clgt/)
   async hearsClaim(@Ctx() ctx: Context) {
-    await this.claimsService.getClaim(ctx);
+    await this.claimsService.getClaim(ctx, 1);
   }
 
   @Hears('get_list')
