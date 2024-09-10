@@ -1,10 +1,16 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { ConfigModule } from '@nestjs/config';
+import { TelegrafModule } from 'nestjs-telegraf';
+import { ClaimsModule } from './claims/claims.module';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    ConfigModule.forRoot({ envFilePath: '.dev.env', isGlobal: true }),
+    TelegrafModule.forRoot({
+      token: process.env.TOKEN,
+      include: [ClaimsModule],
+    }),
+    ClaimsModule,
+  ],
 })
 export class AppModule {}
