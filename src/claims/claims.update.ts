@@ -45,13 +45,21 @@ export class ClaimsUpdate {
     await this.claimsService.getClaim(ctx, 1);
   }
 
+  @Action(/^cancel/)
+  async cancel(@Ctx() ctx: Context) {
+    await this.claimsService.cancel(ctx);
+  }
+
+  @Action(/^claim_action/)
+  async charactersPage(@Ctx() ctx: Context) {
+    await this.claimsService.claimAction(ctx);
+  }
+
+  /**
+   * For testing get_list callback.
+   */
   @Hears('get_list')
   async getList(@Ctx() ctx: Context) {
     await this.claimsService.getListClaims(ctx);
   }
-
-  // @On('sticker')
-  // async on(@Ctx() ctx: Context) {
-  //   await ctx.reply('👍');
-  // }
 }

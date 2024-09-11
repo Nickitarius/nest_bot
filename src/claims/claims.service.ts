@@ -1,41 +1,15 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { AxiosError } from 'axios';
+import * as fs from 'fs';
+import { InjectBot } from 'nestjs-telegraf';
 import { catchError, firstValueFrom } from 'rxjs';
 import { Context, Markup, Telegraf } from 'telegraf';
-import { v4 as uuidV4 } from 'uuid';
-import * as fs from 'fs';
-import { Pagination } from '../../telegraf-pagination';
-import { InjectBot } from 'nestjs-telegraf';
 import { transliterate } from 'transliteration';
+import { v4 as uuidV4 } from 'uuid';
+import { Pagination } from '../../telegraf-pagination';
 import * as Buttons from './buttons';
-
-/**
- * Returns string with all characters incompatible
- with Telegram's MarkdonwnV2 shielded.*/
-function getMarkdownV2Shielded(string: string): string {
-  return (
-    string
-      .replace(/\_/g, '\\_')
-      // .replace(/\*/g, '\\*')
-      .replace(/\[/g, '\\[')
-      .replace(/\]/g, '\\]')
-      .replace(/\(/g, '\\(')
-      .replace(/\)/g, '\\)')
-      .replace(/\~/g, '\\~')
-      .replace(/\`/g, '\\`')
-      .replace(/\>/g, '\\>')
-      .replace(/\#/g, '\\#')
-      .replace(/\+/g, '\\+')
-      .replace(/\-/g, '\\-')
-      .replace(/\=/g, '\\=')
-      .replace(/\|/g, '\\|')
-      .replace(/\{/g, '\\{')
-      .replace(/\}/g, '\\}')
-      .replace(/\./g, '\\.')
-      .replace(/\!/g, '\\!')
-  );
-}
+import * as Utils from './utils';
 
 @Injectable()
 export class ClaimsService {
@@ -46,29 +20,11 @@ export class ClaimsService {
   private readonly logger = new Logger(ClaimsService.name);
   private apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims`;
 
-  echo(text: string): string {
-    return `Echo: ${text}`;
-  }
-
   async getShortClaims(context: Context) {
     const uuidOne = uuidV4();
 
-    let user, query;
-    try {
-      query = context.callbackQuery;
-      user = query.from;
-    } catch {
-      query = context.update?.['message'];
-      user = query.chat;
-    }
-
+    const { user, requestConfig } = Utils.getReqConfig(context);
     const url = this.apiClaims + `?uid=${user.id}`;
-    const requestConfig = {
-      auth: {
-        username: process.env.API_USER,
-        password: process.env.API_PASS,
-      },
-    };
 
     let keyboard, replyMarkup, data;
 
@@ -135,8 +91,6 @@ export class ClaimsService {
           assigned = claim.assigned;
         }
 
-        console.log(claim);
-
         keyboard.push([Buttons.getClaimButton(claim)]);
       });
 
@@ -182,50 +136,19 @@ export class ClaimsService {
         parse_mode: 'MarkdownV2',
       });
     }
-
-    return;
   }
 
-  async help(context: Context) {
-    const page =
-      `Help\n` +
-      `1. Бери заявку в работу.\n` +
-      `2. Закрывай или возвращай обратно.\n` +
-      `3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.\n` +
-      `4. Можно по заявке узнать логин\\пароль для PPPOE.\n` +
-      `5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
-
-    const keyboard = [Buttons.getShortClaimsButton('Загрузить заявки')];
-    const replyMarkup = Markup.inlineKeyboard(keyboard);
-
-    await context.reply(page, replyMarkup);
-  }
-
-  /**Replies with a paginator containing all claims.*/
+  /**
+   *Replies with a paginator containing all claims.
+   */
   async getListClaims(context: Context) {
     const uuidOne = uuidV4();
 
-    let user, query;
-    try {
-      query = context.callbackQuery;
-      user = query.from;
-    } catch {
-      query = context.update?.['message'];
-      user = query.chat;
-    }
-
+    const { user, requestConfig } = Utils.getReqConfig(context);
     const url = this.apiClaims + `?uid=${user.id}`;
-    const requestConfig = {
-      auth: {
-        username: process.env.API_USER,
-        password: process.env.API_PASS,
-      },
-    };
 
-    let response;
-    let keyboard, replyMarkup;
+    let response, keyboard, replyMarkup, data;
 
-    let data;
     if (process.argv.includes('dev')) {
       this.logger.log(
         `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
@@ -278,42 +201,11 @@ export class ClaimsService {
       let tmpClaim;
 
       data.claims.forEach((claim) => {
-        claim.client_contract ??= '-';
-        claim.client_name ??= '-';
-        claim.claim_phone ??= '-';
-        claim.claim_addr ??= '-';
-        claim.autor ??= '-';
-        claim.assigned ??= '-';
-        claim.comment ??= '-';
-        claim.work_commentary ??= '-';
-        claim.lw_date_change ??= '-';
-        claim.status_name ??= '-';
-
-        claim.claim_addr = claim.claim_addr.replaceAll('_', '-');
-        claim.claim_date = claim.claim_date.replaceAll('_', '-');
-        claim.client_contract = claim.client_contract.replaceAll('_', '-');
-        claim.client_name = claim.client_name.replaceAll('_', '-');
-        claim.claim_phone = claim.claim_phone.replaceAll('_', '-');
-        claim.autor = claim.autor.replaceAll('_', '-');
-        claim.assigned = claim.assigned.replaceAll('_', '-');
-        claim.comment = claim.comment.replaceAll('_', '-');
+        tmpClaim = Utils.formClaimDescription(claim);
 
         claimsNumbers.push(claim.claim_no);
 
-        tmpClaim =
-          `*Обращениe №:* ${claim.claim_no}\n` +
-          `*Статус:* ${claim.status_name}\n` +
-          `*Дата:* ${claim.claim_date}\n` +
-          `*Договор:* ${claim.client_contract}\n` +
-          `*Телефон:* ${claim.claim_phone}\n` +
-          `*Имя:* ${claim.client_name}\n` +
-          `*Адрес:* ${claim.claim_addr}\n` +
-          `*Инициатор:* ${claim.autor}\n` +
-          `*Исполнитель:* ${claim.assigned}\n` +
-          `*Комментарий к заявке:* ${claim.comment}\n` +
-          `*Комментарий к работе:* ${claim.work_commentary}\n\n`;
-
-        claims.push(getMarkdownV2Shielded(tmpClaim));
+        claims.push(Utils.getMarkdownV2Shielded(tmpClaim));
       });
     } else {
       this.logger.log(
@@ -429,28 +321,11 @@ export class ClaimsService {
   async getClaim(context: Context, claimNo: number) {
     const uuidOne = uuidV4();
 
-    let user, query;
-    // let fl;
-    try {
-      query = context.callbackQuery;
-      user = query.from;
-      // fl = 'cl';
-    } catch {
-      query = context.update?.['message'];
-      user = query.chat;
-      // fl = 'ms';
-    }
+    const { user, requestConfig } = Utils.getReqConfig(context);
 
     const url = this.apiClaims + `/${claimNo}?uid=${user.id}`;
-    const requestConfig = {
-      auth: {
-        username: process.env.API_USER,
-        password: process.env.API_PASS,
-      },
-    };
 
-    let data;
-    let replyMarkup;
+    let data, replyMarkup;
     let keyboard = [];
 
     if (process.argv.includes('dev')) {
@@ -486,29 +361,8 @@ export class ClaimsService {
     }
 
     if (data != undefined) {
-      // let status = 'Активна (в работе)';
-
-      data.client_contract ??= '-';
-      data.client_name ??= '-';
-      data.claim_phone ??= '-';
-      data.claim_addr ??= '-';
-      data.autor ??= '-';
-      data.assigned ??= '-';
-      data.comment ??= '-';
-      data.work_commentary ??= '-';
-      data.lw_date_change ??= '-';
-      data.status_name ??= '-';
-
-      data.claim_addr = data.claim_addr.replaceAll('_', '-');
-      data.claim_date = data.claim_date.replaceAll('_', '-');
-      data.client_contract = data.client_contract.replaceAll('_', '-');
-      data.client_name = data.client_name.replaceAll('_', '-');
-      data.claim_phone = data.claim_phone.replaceAll('_', '-');
-      data.autor = data.autor.replaceAll('_', '-');
-      data.assigned = data.assigned.replaceAll('_', '-');
-      data.comment = data.comment.replaceAll('_', '-');
-
-      // status = '';
+      let page = Utils.formClaimDescription(data);
+      page = Utils.getMarkdownV2Shielded(page);
 
       const clientContract = transliterate(data.client_contract);
       const tail = `${data.id}_${data.claim_no}_${data.claim_phone}_${clientContract}`;
@@ -545,22 +399,6 @@ export class ClaimsService {
 
       keyboard.push([Buttons.getShortClaimsButton('К списку')]);
 
-      let page =
-        `*Обращениe №:* ${data.claim_no}\n` +
-        `*Статус:* ${data.status_name}\n` +
-        `*Дата:* ${data.claim_date}\n` +
-        `*Договор:* ${data.client_contract}\n` +
-        `*Телефон:* ${data.claim_phone}\n` +
-        `*Имя:* ${data.client_name}\n` +
-        `*Адрес:* ${data.claim_addr}\n` +
-        `*Инициатор:* ${data.autor}\n` +
-        `*Исполнитель:* ${data.assigned}\n` +
-        `*Комментарий к заявке:* ${data.comment}\n` +
-        `*Комментарий к работе:* ${data.work_commentary}\n\n`;
-      page = getMarkdownV2Shielded(page);
-
-      console.log(keyboard);
-
       replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
       try {
@@ -587,5 +425,56 @@ export class ClaimsService {
         await context.reply('Что то пошло не так :(', replyMarkup);
       }
     }
+  }
+
+  async help(context: Context) {
+    const page =
+      `Help\n` +
+      `1. Бери заявку в работу.\n` +
+      `2. Закрывай или возвращай обратно.\n` +
+      `3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.\n` +
+      `4. Можно по заявке узнать логин\\пароль для PPPOE.\n` +
+      `5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
+
+    const keyboard = [Buttons.getShortClaimsButton('Загрузить заявки')];
+    const replyMarkup = Markup.inlineKeyboard(keyboard);
+
+    await context.reply(page, replyMarkup);
+  }
+
+  async cancel(context: Context) {
+    if (process.argv.includes('dev')) {
+      this.logger.log(
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
+      );
+    }
+
+    const keyboard = Markup.inlineKeyboard([
+      [Buttons.getShortClaimsButton('Загрузить заявки')],
+    ]);
+    const replyMarkup = keyboard.reply_markup;
+
+    await context.editMessageText('Доброго дня\\!', {
+      reply_markup: replyMarkup,
+      parse_mode: 'MarkdownV2',
+    });
+  }
+
+  async claimAction(context: Context) {
+    // TODO
+    const uuidOne = uuidV4();
+
+    if (process.argv.includes('dev')) {
+      this.logger.log(
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
+      );
+    }
+
+    const { user, requestConfig } = getReqConfig(context);
+    const url = `${this.apiClaims}/action?uid=${user.id}`;
+
+    let response, keyboard, replyMarkup, data;
+
+    console.log(context);
   }
 }
