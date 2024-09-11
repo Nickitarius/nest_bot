@@ -16,7 +16,7 @@ export class ClaimsUpdate {
     await this.claimsService.getShortClaims(ctx);
   }
 
-  @Action(/^getShortClaims/)
+  @Action(/^get_short_claims/)
   async getShortClaims(@Ctx() ctx: Context) {
     await this.claimsService.getShortClaims(ctx);
   }
@@ -33,8 +33,11 @@ export class ClaimsUpdate {
 
   @Action(/^clgt_/)
   async getClaim(@Ctx() ctx: Context) {
-    // console.log(context);
-    await this.claimsService.getClaim(ctx, 1);
+    console.log(ctx);
+    const claimNo = parseInt(
+      ctx.update?.['callback_query'].data.replace('clgt_', ''),
+    );
+    await this.claimsService.getClaim(ctx, claimNo);
   }
 
   @Hears(/clgt/)

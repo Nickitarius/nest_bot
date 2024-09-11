@@ -7,7 +7,8 @@ import { v4 as uuidV4 } from 'uuid';
 import * as fs from 'fs';
 import { Pagination } from '../../telegraf-pagination';
 import { InjectBot } from 'nestjs-telegraf';
-// import { inlineKeyboard } from 'telegraf/typings/markup';
+import { transliterate } from 'transliteration';
+import * as Buttons from './buttons';
 
 /**
  * Returns string with all characters incompatible
@@ -43,6 +44,7 @@ export class ClaimsService {
     @InjectBot() private bot: Telegraf<Context>,
   ) {}
   private readonly logger = new Logger(ClaimsService.name);
+  private apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims`;
 
   echo(text: string): string {
     return `Echo: ${text}`;
@@ -57,10 +59,10 @@ export class ClaimsService {
       user = query.from;
     } catch {
       query = context.update?.['message'];
-      user = query.from;
+      user = query.chat;
     }
 
-    const apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims?uid=${user.id}`;
+    const url = this.apiClaims + `?uid=${user.id}`;
     const requestConfig = {
       auth: {
         username: process.env.API_USER,
@@ -68,26 +70,24 @@ export class ClaimsService {
       },
     };
 
-    let response;
-    let keyboard, replyMarkup;
+    let keyboard, replyMarkup, data;
 
     try {
-      this.logger.log(`${user.id}(${user.username}) Request ${apiClaims}`);
-      response = await firstValueFrom(
-        this.httpService.get(apiClaims, requestConfig).pipe(
+      this.logger.log(`${user.id}(${user.username}) Request ${url}`);
+      const response = await firstValueFrom(
+        this.httpService.get(url, requestConfig).pipe(
           catchError((error: AxiosError) => {
             throw error.response.data;
           }),
         ),
       );
+      data = response.data;
     } catch (error) {
       this.logger.error(
         `UUID: ${uuidOne} USER_ID: ${user.id} CODE: ${error.statusCode} DATA: ${JSON.stringify(error)}`,
       );
 
-      keyboard = [
-        Markup.button.callback('Попробовать снова', 'getShortClaims'),
-      ];
+      keyboard = [Buttons.getShortClaimsButton('Попробовать снова')];
       replyMarkup = Markup.inlineKeyboard(keyboard);
 
       try {
@@ -105,7 +105,6 @@ export class ClaimsService {
       return;
     }
 
-    const data = response.data;
     let page;
 
     if (data.length != 0) {
@@ -135,6 +134,10 @@ export class ClaimsService {
         if (assigned == null) {
           assigned = claim.assigned;
         }
+
+        console.log(claim);
+
+        keyboard.push([Buttons.getClaimButton(claim)]);
       });
 
       page =
@@ -148,9 +151,7 @@ export class ClaimsService {
         `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
       );
 
-      keyboard = [
-        Markup.button.callback('Попробовать снова', 'getShortClaims'),
-      ];
+      keyboard = [Buttons.getShortClaimsButton('Попробовать снова')];
       replyMarkup = Markup.inlineKeyboard(keyboard);
 
       try {
@@ -168,16 +169,16 @@ export class ClaimsService {
       return;
     }
 
-    replyMarkup = Markup.inlineKeyboard(keyboard);
+    replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
     try {
       await context.editMessageText(page, {
-        reply_markup: replyMarkup.reply_markup,
+        reply_markup: replyMarkup,
         parse_mode: 'MarkdownV2',
       });
     } catch {
       await context.reply(page, {
-        reply_markup: replyMarkup.reply_markup,
+        reply_markup: replyMarkup,
         parse_mode: 'MarkdownV2',
       });
     }
@@ -194,9 +195,7 @@ export class ClaimsService {
       `4. Можно по заявке узнать логин\\пароль для PPPOE.\n` +
       `5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
 
-    const keyboard = [
-      Markup.button.callback('Загрузить заявки', 'getShortClaims'),
-    ];
+    const keyboard = [Buttons.getShortClaimsButton('Загрузить заявки')];
     const replyMarkup = Markup.inlineKeyboard(keyboard);
 
     await context.reply(page, replyMarkup);
@@ -212,10 +211,10 @@ export class ClaimsService {
       user = query.from;
     } catch {
       query = context.update?.['message'];
-      user = query.from;
+      user = query.chat;
     }
 
-    const apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims?uid=${user.id}`;
+    const url = this.apiClaims + `?uid=${user.id}`;
     const requestConfig = {
       auth: {
         username: process.env.API_USER,
@@ -229,17 +228,17 @@ export class ClaimsService {
     let data;
     if (process.argv.includes('dev')) {
       this.logger.log(
-        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update)}\n####Update END####`,
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
       );
       data = JSON.parse(
-        fs.readFileSync('data/data_just_one_entry.json', 'utf-8'), //data_just_one_entry
+        fs.readFileSync('data/data.json', 'utf-8'), //data_just_one_entry
       );
     } else {
       try {
-        this.logger.log(`${user.id}(${user.username}) Request ${apiClaims}`);
+        this.logger.log(`${user.id}(${user.username}) Request ${url}`);
 
         response = await firstValueFrom(
-          this.httpService.get(apiClaims, requestConfig).pipe(
+          this.httpService.get(url, requestConfig).pipe(
             catchError((error: AxiosError) => {
               throw error.response.data;
             }),
@@ -250,9 +249,7 @@ export class ClaimsService {
           `UUID: ${uuidOne} USER_ID: ${user.id} CODE: ${error.statusCode} DATA: ${JSON.stringify(error)}`,
         );
 
-        keyboard = [
-          Markup.button.callback('Попробовать снова', 'getShortClaims'),
-        ];
+        keyboard = [Buttons.getShortClaimsButton('Попоробовать снова')];
         replyMarkup = Markup.inlineKeyboard(keyboard);
 
         try {
@@ -281,6 +278,17 @@ export class ClaimsService {
       let tmpClaim;
 
       data.claims.forEach((claim) => {
+        claim.client_contract ??= '-';
+        claim.client_name ??= '-';
+        claim.claim_phone ??= '-';
+        claim.claim_addr ??= '-';
+        claim.autor ??= '-';
+        claim.assigned ??= '-';
+        claim.comment ??= '-';
+        claim.work_commentary ??= '-';
+        claim.lw_date_change ??= '-';
+        claim.status_name ??= '-';
+
         claim.claim_addr = claim.claim_addr.replaceAll('_', '-');
         claim.claim_date = claim.claim_date.replaceAll('_', '-');
         claim.client_contract = claim.client_contract.replaceAll('_', '-');
@@ -289,13 +297,6 @@ export class ClaimsService {
         claim.autor = claim.autor.replaceAll('_', '-');
         claim.assigned = claim.assigned.replaceAll('_', '-');
         claim.comment = claim.comment.replaceAll('_', '-');
-
-        if (claim.work_commentary != undefined) {
-          claim.work_commentary = claim.work_commentary.replaceAll('_', '-');
-        }
-        if (claim.status_name != undefined) {
-          claim.status_name = claim.status_name.replaceAll('_', '-');
-        }
 
         claimsNumbers.push(claim.claim_no);
 
@@ -319,9 +320,7 @@ export class ClaimsService {
         `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
       );
 
-      keyboard = [
-        Markup.button.callback('Попробовать снова', 'getShortClaims'),
-      ];
+      keyboard = [Buttons.getShortClaimsButton('Попробовать снова')];
       replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
       try {
@@ -368,7 +367,7 @@ export class ClaimsService {
         this.getClaim(context, item.claimNo);
       },
       parse_mode: 'MarkdownV2',
-      inlineCustomButtons: [[Markup.button.callback('Выход', 'cancel')]],
+      inlineCustomButtons: [Buttons.cancelButton],
       isEnablePageButtons: true,
     });
 
@@ -382,12 +381,7 @@ export class ClaimsService {
       switch (claim.id) {
         case 10:
         case 20:
-          customButtons.push([
-            Markup.button.callback(
-              'В работу',
-              `cl_action_takework_${claim.id}_${claim.claim_no}_${claim.claim_phone}`,
-            ),
-          ]);
+          customButtons.push([Buttons.takeWorkButton(claim)]);
           break;
         case 666:
           this.logger.warn(
@@ -395,26 +389,15 @@ export class ClaimsService {
           );
           break;
         default:
+          keyboard.push([Buttons.failedCallSMSButton(user)]);
           keyboard.push([
-            Markup.button.callback(
-              'SMS о недозвоне',
-              `cl_action_senddefsms_${user.id}_${user.username}_${user.claim_phone}`,
-            ),
-          ]);
-          keyboard.push([
-            Markup.button.callback(
-              'Закрыть заявку',
-              `cl_action_complete_${user.id}_${user.username}_${user.claim_phone}`,
-            ),
-            Markup.button.callback(
-              'Вернуть заявку',
-              `cl_action_return_${user.id}_${user.username}_${user.claim_phone}`,
-            ),
+            Buttons.closeClaimButton(user),
+            Buttons.returnClaimButton(user),
           ]);
       }
     }
 
-    customButtons.push([Markup.button.callback('Выход', 'cancel')]);
+    customButtons.push([Buttons.cancelButton]);
 
     paginator.inlineCustomButtons = customButtons;
 
@@ -442,8 +425,167 @@ export class ClaimsService {
     paginator.handleActions(this.bot);
   }
 
+  /**Returns claim with specified number. */
   async getClaim(context: Context, claimNo: number) {
-    console.log(claimNo);
-    // console.log(context);
+    const uuidOne = uuidV4();
+
+    let user, query;
+    // let fl;
+    try {
+      query = context.callbackQuery;
+      user = query.from;
+      // fl = 'cl';
+    } catch {
+      query = context.update?.['message'];
+      user = query.chat;
+      // fl = 'ms';
+    }
+
+    const url = this.apiClaims + `/${claimNo}?uid=${user.id}`;
+    const requestConfig = {
+      auth: {
+        username: process.env.API_USER,
+        password: process.env.API_PASS,
+      },
+    };
+
+    let data;
+    let replyMarkup;
+    let keyboard = [];
+
+    if (process.argv.includes('dev')) {
+      this.logger.log(
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update)}\n####Update END####`,
+      );
+      data = JSON.parse(
+        fs.readFileSync('data/data.json', 'utf-8'), //data_just_one_entry
+      );
+      let hasRequiredClaim = false;
+      for (const claim of data.claims) {
+        if (claim.claim_no === claimNo) {
+          data = claim;
+          hasRequiredClaim = true;
+          break;
+        }
+      }
+      if (!hasRequiredClaim) {
+        this.logger.log(
+          `claimIndex not found.\nclaim_no : ${claimNo}\ndata: ${JSON.stringify(data)}`,
+        );
+      }
+    } else {
+      this.logger.log(`${user.id}(${user.username}) Request ${url}`);
+      const response = await firstValueFrom(
+        this.httpService.get(url, requestConfig).pipe(
+          catchError((error: AxiosError) => {
+            throw error.response.data;
+          }),
+        ),
+      );
+      data = response.data;
+    }
+
+    if (data != undefined) {
+      // let status = 'Активна (в работе)';
+
+      data.client_contract ??= '-';
+      data.client_name ??= '-';
+      data.claim_phone ??= '-';
+      data.claim_addr ??= '-';
+      data.autor ??= '-';
+      data.assigned ??= '-';
+      data.comment ??= '-';
+      data.work_commentary ??= '-';
+      data.lw_date_change ??= '-';
+      data.status_name ??= '-';
+
+      data.claim_addr = data.claim_addr.replaceAll('_', '-');
+      data.claim_date = data.claim_date.replaceAll('_', '-');
+      data.client_contract = data.client_contract.replaceAll('_', '-');
+      data.client_name = data.client_name.replaceAll('_', '-');
+      data.claim_phone = data.claim_phone.replaceAll('_', '-');
+      data.autor = data.autor.replaceAll('_', '-');
+      data.assigned = data.assigned.replaceAll('_', '-');
+      data.comment = data.comment.replaceAll('_', '-');
+
+      // status = '';
+
+      const clientContract = transliterate(data.client_contract);
+      const tail = `${data.id}_${data.claim_no}_${data.claim_phone}_${clientContract}`;
+
+      switch (data.id) {
+        case 10:
+        case 20:
+          keyboard.push([[Buttons.takeWorkButton(data)]]);
+          break;
+        case 666:
+          this.logger.warn(
+            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data)}`,
+          );
+          break;
+        default:
+          keyboard.push([Buttons.failedCallSMSButton(user)]);
+          keyboard.push([
+            Markup.button.callback(
+              'Логин и пароль',
+              `cl_action_getaccounts_${tail}`,
+            ),
+          ]);
+          keyboard.push([
+            Markup.button.callback(
+              'Комментарий',
+              `cl_action_addcomment_${tail}`,
+            ),
+          ]);
+          keyboard.push([
+            Buttons.closeClaimButton(user),
+            Buttons.returnClaimButton(user),
+          ]);
+      }
+
+      keyboard.push([Buttons.getShortClaimsButton('К списку')]);
+
+      let page =
+        `*Обращениe №:* ${data.claim_no}\n` +
+        `*Статус:* ${data.status_name}\n` +
+        `*Дата:* ${data.claim_date}\n` +
+        `*Договор:* ${data.client_contract}\n` +
+        `*Телефон:* ${data.claim_phone}\n` +
+        `*Имя:* ${data.client_name}\n` +
+        `*Адрес:* ${data.claim_addr}\n` +
+        `*Инициатор:* ${data.autor}\n` +
+        `*Исполнитель:* ${data.assigned}\n` +
+        `*Комментарий к заявке:* ${data.comment}\n` +
+        `*Комментарий к работе:* ${data.work_commentary}\n\n`;
+      page = getMarkdownV2Shielded(page);
+
+      console.log(keyboard);
+
+      replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+
+      try {
+        await context.editMessageText(page, {
+          reply_markup: replyMarkup,
+          parse_mode: 'MarkdownV2',
+        });
+      } catch {
+        this.logger.debug(`DEBBUG: ${page}\n ${replyMarkup}`);
+        await context.reply(page, {
+          reply_markup: replyMarkup,
+          parse_mode: 'MarkdownV2',
+        });
+      }
+    } else {
+      this.logger.warn(`Couldn't get claim; data = ${JSON.stringify(data)}`);
+      keyboard = [
+        [Buttons.getShortClaimsButton('К списку'), Buttons.cancelButton],
+      ];
+      replyMarkup = Markup.inlineKeyboard(keyboard);
+      try {
+        await context.editMessageText('Что то пошло не так :(', replyMarkup);
+      } catch {
+        await context.reply('Что то пошло не так :(', replyMarkup);
+      }
+    }
   }
 }
