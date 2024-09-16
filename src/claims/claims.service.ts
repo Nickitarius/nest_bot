@@ -8,8 +8,8 @@ import { Context, Markup, Telegraf } from 'telegraf';
 import { transliterate } from 'transliteration';
 import { v4 as uuidV4 } from 'uuid';
 import { Pagination } from '../../telegraf-pagination';
-import * as Buttons from './buttons';
-import * as Utils from './utils';
+import { Buttons } from './buttons';
+import { ClaimsUtils } from './utils';
 
 @Injectable()
 export class ClaimsService {
@@ -23,43 +23,25 @@ export class ClaimsService {
   async getShortClaims(context: Context) {
     const uuidOne = uuidV4();
 
-    const { user, requestConfig } = Utils.getReqConfig(context);
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
     const url = this.apiClaims + `?uid=${user.id}`;
 
-    let keyboard, replyMarkup, data;
+    let keyboard, replyMarkup, response;
 
     try {
       this.logger.log(`${user.id}(${user.username}) Request ${url}`);
-      const response = await firstValueFrom(
+      response = await firstValueFrom(
         this.httpService.get(url, requestConfig).pipe(
           catchError((error: AxiosError) => {
-            throw error.response.data;
+            throw error;
           }),
         ),
       );
-      data = response.data;
     } catch (error) {
-      this.logger.error(
-        `UUID: ${uuidOne} USER_ID: ${user.id} CODE: ${error.statusCode} DATA: ${JSON.stringify(error)}`,
-      );
-
-      keyboard = [Buttons.getShortClaimsButton('Попробовать снова')];
-      replyMarkup = Markup.inlineKeyboard(keyboard);
-
-      try {
-        await context.editMessageText(
-          `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
-          replyMarkup,
-        );
-      } catch {
-        await context.reply(
-          `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
-          replyMarkup,
-        );
-      }
-
+      ClaimsUtils.handleAxiosError(error, uuidOne, context, user, this.logger);
       return;
     }
+    const data = response.data;
 
     let page;
 
@@ -102,7 +84,7 @@ export class ClaimsService {
         `*Исполнитель*: ${assigned}`;
     } else {
       this.logger.log(
-        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
+        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data, null, 3)}`,
       );
 
       keyboard = [Buttons.getShortClaimsButton('Попробовать снова')];
@@ -144,7 +126,7 @@ export class ClaimsService {
   async getListClaims(context: Context) {
     const uuidOne = uuidV4();
 
-    const { user, requestConfig } = Utils.getReqConfig(context);
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
     const url = this.apiClaims + `?uid=${user.id}`;
 
     let response, keyboard, replyMarkup, data;
@@ -163,29 +145,18 @@ export class ClaimsService {
         response = await firstValueFrom(
           this.httpService.get(url, requestConfig).pipe(
             catchError((error: AxiosError) => {
-              throw error.response.data;
+              throw error;
             }),
           ),
         );
       } catch (error) {
-        this.logger.error(
-          `UUID: ${uuidOne} USER_ID: ${user.id} CODE: ${error.statusCode} DATA: ${JSON.stringify(error)}`,
+        ClaimsUtils.handleAxiosError(
+          error,
+          uuidOne,
+          context,
+          user,
+          this.logger,
         );
-
-        keyboard = [Buttons.getShortClaimsButton('Попоробовать снова')];
-        replyMarkup = Markup.inlineKeyboard(keyboard);
-
-        try {
-          await context.editMessageText(
-            `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
-            replyMarkup,
-          );
-        } catch {
-          await context.reply(
-            `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
-            replyMarkup,
-          );
-        }
 
         return;
       }
@@ -201,15 +172,15 @@ export class ClaimsService {
       let tmpClaim;
 
       data.claims.forEach((claim) => {
-        tmpClaim = Utils.formClaimDescription(claim);
+        tmpClaim = ClaimsUtils.formClaimDescription(claim);
 
         claimsNumbers.push(claim.claim_no);
 
-        claims.push(Utils.getMarkdownV2Shielded(tmpClaim));
+        claims.push(ClaimsUtils.getMarkdownV2Shielded(tmpClaim));
       });
     } else {
       this.logger.log(
-        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
+        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data, null, 3)}`,
       );
 
       keyboard = [Buttons.getShortClaimsButton('Попробовать снова')];
@@ -277,7 +248,7 @@ export class ClaimsService {
           break;
         case 666:
           this.logger.warn(
-            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data)}`,
+            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data, null, 3)}`,
           );
           break;
         default:
@@ -321,16 +292,16 @@ export class ClaimsService {
   async getClaim(context: Context, claimNo: number) {
     const uuidOne = uuidV4();
 
-    const { user, requestConfig } = Utils.getReqConfig(context);
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
 
     const url = this.apiClaims + `/${claimNo}?uid=${user.id}`;
 
-    let data, replyMarkup;
+    let data, replyMarkup, response;
     let keyboard = [];
 
     if (process.argv.includes('dev')) {
       this.logger.log(
-        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update)}\n####Update END####`,
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
       );
       data = JSON.parse(
         fs.readFileSync('data/data.json', 'utf-8'), //data_just_one_entry
@@ -345,36 +316,48 @@ export class ClaimsService {
       }
       if (!hasRequiredClaim) {
         this.logger.log(
-          `claimIndex not found.\nclaim_no : ${claimNo}\ndata: ${JSON.stringify(data)}`,
+          `claimIndex not found.\nclaim_no : ${claimNo}\ndata: ${JSON.stringify(data, null, 3)}`,
         );
       }
     } else {
-      this.logger.log(`${user.id}(${user.username}) Request ${url}`);
-      const response = await firstValueFrom(
-        this.httpService.get(url, requestConfig).pipe(
-          catchError((error: AxiosError) => {
-            throw error.response.data;
-          }),
-        ),
-      );
+      try {
+        this.logger.log(`${user.id}(${user.username}) Request ${url}`);
+        response = await firstValueFrom(
+          this.httpService.get(url, requestConfig).pipe(
+            catchError((error: AxiosError) => {
+              throw error;
+            }),
+          ),
+        );
+      } catch (error) {
+        ClaimsUtils.handleAxiosError(
+          error,
+          uuidOne,
+          context,
+          user,
+          this.logger,
+        );
+
+        return;
+      }
       data = response.data;
     }
 
     if (data != undefined) {
-      let page = Utils.formClaimDescription(data);
-      page = Utils.getMarkdownV2Shielded(page);
+      let page = ClaimsUtils.formClaimDescription(data);
+      page = ClaimsUtils.getMarkdownV2Shielded(page);
 
       const clientContract = transliterate(data.client_contract);
       const tail = `${data.id}_${data.claim_no}_${data.claim_phone}_${clientContract}`;
 
-      switch (data.id) {
+      switch (data.status_id) {
         case 10:
         case 20:
-          keyboard.push([[Buttons.takeWorkButton(data)]]);
+          keyboard.push([Buttons.takeWorkButton(data)]);
           break;
         case 666:
           this.logger.warn(
-            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data)}`,
+            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data, null, 3)}`,
           );
           break;
         default:
@@ -398,7 +381,6 @@ export class ClaimsService {
       }
 
       keyboard.push([Buttons.getShortClaimsButton('К списку')]);
-
       replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
       try {
@@ -414,7 +396,9 @@ export class ClaimsService {
         });
       }
     } else {
-      this.logger.warn(`Couldn't get claim; data = ${JSON.stringify(data)}`);
+      this.logger.warn(
+        `Couldn't get claim; data = ${JSON.stringify(data, null, 3)}`,
+      );
       keyboard = [
         [Buttons.getShortClaimsButton('К списку'), Buttons.cancelButton],
       ];
@@ -461,7 +445,6 @@ export class ClaimsService {
   }
 
   async claimAction(context: Context) {
-    // TODO
     const uuidOne = uuidV4();
 
     if (process.argv.includes('dev')) {
@@ -470,11 +453,128 @@ export class ClaimsService {
       );
     }
 
-    const { user, requestConfig } = getReqConfig(context);
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
     const url = `${this.apiClaims}/action?uid=${user.id}`;
 
-    let response, keyboard, replyMarkup, data;
+    let keyboard, data, action, page;
 
-    console.log(context);
+    try {
+      action = context.callbackQuery?.['data'].split('_');
+    } catch {
+      action = [0, 0, 'complete'];
+    }
+
+    // this.httpService.post()
+
+    switch (action[2]) {
+      case 'takework':
+        const response = await this.actionMakePostReq(
+          uuidOne,
+          action,
+          user,
+          url,
+          requestConfig,
+        );
+        if (response.status == 0) {
+          this.logger.log(
+            `TAKEWORK: ${uuidOne}; ${action[4]}, ${JSON.stringify(user, null, 3)}; ${response['response']}`,
+          );
+
+          keyboard = [[Markup.button.callback('OK', `clgt_${action[4]}`)]];
+          page = 'Заявка взята в работу';
+        } else {
+          this.logger.error(
+            `TAKEWORK ERROR: ${uuidOne}; ${action[4]}, ${user}; ${JSON.stringify(response['error'], null, 3)};\
+             DATASEND: ${JSON.stringify(response['datasend'], null, 3)}; DATAREAD: ${JSON.stringify(response['dataread'], null, 3)}`,
+          );
+
+          keyboard = [[Markup.button.callback('OK', `clgt_${action[4]}`)]];
+
+          page =
+            `*${JSON.stringify(response['datasend'], null, 3)}*\n\n` +
+            `${JSON.stringify(response['error'], null, 3)}\n` +
+            `Type: ${action[2]}\nClaim: ${action[4]}\nUser Id: ${user.id}\n` +
+            `UUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже.`;
+          page = ClaimsUtils.getMarkdownV2Shielded(page);
+        }
+    }
+
+    const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+
+    await context.editMessageText(page, {
+      reply_markup: replyMarkup,
+      parse_mode: 'MarkdownV2',
+    });
+  }
+
+  /**Makes a POST request to the API server. Returns status and response. */
+  async actionMakePostReq(uuidOne, action, user, url, requestConfig) {
+    let data;
+    data = {
+      id: uuidOne,
+      type: action[2],
+      claim_id: action[3],
+      claim_no: action[4],
+      username: user.username,
+      first_name: user.first_name,
+      user_id: user.user_id,
+    };
+
+    switch (action[2]) {
+      case 'complete':
+      case 'return':
+      case 'addcomment':
+        data['commentary'] = action[7];
+        break;
+      case 'senddefsms':
+        data['options'] = { phone: action[5], def_id: 1 };
+        break;
+      case 'getaccounts':
+        const clientContract = transliterate(action[6]);
+        console.log('sssssssssssssss');
+        console.log(clientContract);
+        data = {
+          id: uuidOne,
+          type: action[2],
+          user_id: user.user_id,
+        };
+        data['options'] = { contract: clientContract };
+    }
+
+    // requestConfig['Content-Type'] = 'application/json';
+    // requestConfig['Content-Length'] = data.length;
+
+    let response, res;
+    try {
+      response = await firstValueFrom(
+        this.httpService.post(url, data, requestConfig).pipe(
+          catchError((error: AxiosError) => {
+            throw error;
+          }),
+        ),
+      );
+      // console.log('rrrrrrrrrrrrrrrrrrrrrr');
+      // console.log(response);
+    } catch (error) {
+      if (error.response) {
+        res = {
+          status: 1,
+          datasend: JSON.stringify(data, null, 3),
+          dataread: error.message,
+          error: error.response.data.statusCode,
+        };
+      } else {
+        res = {
+          status: 1,
+          datasend: JSON.stringify(data, null, 3),
+          error: error.code,
+        };
+      }
+
+      return res;
+    }
+    res = { status: 0, response: response };
+    return res;
   }
 }

@@ -1,41 +1,43 @@
 import { Markup } from 'telegraf';
 
-/**A midoule with buttons for bot's buttons. */
+/**A class with buttons for bot the bot. */
 
-export function failedCallSMSButton(user) {
-  return Markup.button.callback(
-    'SMS о недозвоне',
-    `cl_action_senddefsms_${user.id}_${user.username}_${user.claim_phone}`,
-  );
-}
+export class Buttons {
+  public static cancelButton = Markup.button.callback('Выход', 'cancel');
 
-export function closeClaimButton(user) {
-  return Markup.button.callback(
-    'Закрыть заявку',
-    `cl_action_complete_${user.id}_${user.username}_${user.claim_phone}`,
-  );
-}
+  static failedCallSMSButton(user, text = 'SMS о недозвоне') {
+    return Markup.button.callback(
+      text,
+      `cl_action_senddefsms_${user.id}_${user.username}_${user.claim_phone}`,
+    );
+  }
 
-export function returnClaimButton(user) {
-  return Markup.button.callback(
-    'Вернуть заявку',
-    `cl_action_return_${user.id}_${user.username}_${user.claim_phone}`,
-  );
-}
+  static closeClaimButton(user, text = 'Закрыть заявку') {
+    return Markup.button.callback(
+      text,
+      `cl_action_complete_${user.id}_${user.username}_${user.claim_phone}`,
+    );
+  }
 
-export function takeWorkButton(claim) {
-  return Markup.button.callback(
-    'В работу',
-    `cl_action_takework_${claim.id}_${claim.claim_no}_${claim.claim_phone}`,
-  );
-}
+  static returnClaimButton(user, text = 'Вернуть заявку') {
+    return Markup.button.callback(
+      text,
+      `cl_action_return_${user.id}_${user.username}_${user.claim_phone}`,
+    );
+  }
 
-export function getClaimButton(claim) {
-  return Markup.button.callback(claim.claim_addr, `clgt_${claim.claim_no}`);
-}
+  static takeWorkButton(claim, text = 'В работу') {
+    return Markup.button.callback(
+      text,
+      `cl_action_takework_${claim.id}_${claim.claim_no}_${claim.claim_phone}`,
+    );
+  }
 
-export const cancelButton = Markup.button.callback('Выход', 'cancel');
+  static getClaimButton(claim, text = claim.claim_addr) {
+    return Markup.button.callback(text, `clgt_${claim.claim_no}`);
+  }
 
-export function getShortClaimsButton(text) {
-  return Markup.button.callback(text, 'get_short_claims');
+  static getShortClaimsButton(text) {
+    return Markup.button.callback(text, 'get_short_claims');
+  }
 }

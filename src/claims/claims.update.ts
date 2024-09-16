@@ -50,7 +50,7 @@ export class ClaimsUpdate {
     await this.claimsService.cancel(ctx);
   }
 
-  @Action(/^claim_action/)
+  @Action(/^cl_action/)
   async charactersPage(@Ctx() ctx: Context) {
     await this.claimsService.claimAction(ctx);
   }
