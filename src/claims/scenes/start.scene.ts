@@ -1,14 +1,4 @@
-import { Scene, SceneEnter, SceneLeave } from 'nestjs-telegraf';
+import { Scene } from 'nestjs-telegraf';
 
-@Scene('START')
-export class CommentScene {
-  @SceneEnter()
-  onSceneEnter() {
-    console.log('Entered START scene');
-  }
-
-  @SceneLeave()
-  onSceneLeave() {
-    console.log('Leave from START scene');
-  }
-}
+@Scene('START_SCENE')
+export class CommentScene {}

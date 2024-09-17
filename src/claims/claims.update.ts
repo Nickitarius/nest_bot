@@ -1,4 +1,4 @@
-import { Action, Ctx, Hears, Help, Start, Update, On } from 'nestjs-telegraf';
+import { Action, Ctx, Hears, Help, Start, Update } from 'nestjs-telegraf';
 import { CustomContext } from 'src/interfaces/context.interface';
 import { ClaimsService } from './claims.service';
 
