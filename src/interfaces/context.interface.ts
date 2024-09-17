@@ -1,3 +1,5 @@
-import { Scenes } from 'telegraf';
+import { Scenes, Context } from 'telegraf';
 
-export interface Context extends Scenes.SceneContext {}
+export interface CustomContext extends Scenes.SceneContext {
+  claimData?: object;
+}

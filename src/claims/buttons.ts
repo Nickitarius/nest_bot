@@ -5,24 +5,24 @@ import { Markup } from 'telegraf';
 export class Buttons {
   public static cancelButton = Markup.button.callback('Выход', 'cancel');
 
-  static failedCallSMSButton(user, text = 'SMS о недозвоне') {
+  static failedCallSMSButton(claim, text = 'SMS о недозвоне') {
     return Markup.button.callback(
       text,
-      `cl_action_senddefsms_${user.id}_${user.username}_${user.claim_phone}`,
+      `cl_action_senddefsms_${claim.id}_${claim.claim_no}_${claim.claim_phone}`,
     );
   }
 
-  static closeClaimButton(user, text = 'Закрыть заявку') {
+  static closeClaimButton(claim, text = 'Закрыть заявку') {
     return Markup.button.callback(
       text,
-      `cl_action_complete_${user.id}_${user.username}_${user.claim_phone}`,
+      `cl_action_complete_${claim.id}_${claim.claim_no}_${claim.claim_phone}`,
     );
   }
 
-  static returnClaimButton(user, text = 'Вернуть заявку') {
+  static returnClaimButton(claim, text = 'Вернуть заявку') {
     return Markup.button.callback(
       text,
-      `cl_action_return_${user.id}_${user.username}_${user.claim_phone}`,
+      `cl_action_return_${claim.id}_${claim.claim_no}_${claim.claim_phone}`,
     );
   }
 

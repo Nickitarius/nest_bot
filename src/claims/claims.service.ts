@@ -4,23 +4,24 @@ import { AxiosError } from 'axios';
 import * as fs from 'fs';
 import { InjectBot } from 'nestjs-telegraf';
 import { catchError, firstValueFrom } from 'rxjs';
-import { Context, Markup, Telegraf } from 'telegraf';
+import { Markup, Telegraf } from 'telegraf';
 import { transliterate } from 'transliteration';
 import { v4 as uuidV4 } from 'uuid';
 import { Pagination } from '../../telegraf-pagination';
 import { Buttons } from './buttons';
 import { ClaimsUtils } from './utils';
+import { CustomContext } from 'src/interfaces/context.interface';
 
 @Injectable()
 export class ClaimsService {
   constructor(
     private readonly httpService: HttpService,
-    @InjectBot() private bot: Telegraf<Context>,
+    @InjectBot() private bot: Telegraf<CustomContext>,
   ) {}
   private readonly logger = new Logger(ClaimsService.name);
   private apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims`;
 
-  async getShortClaims(context: Context) {
+  async getShortClaims(context: CustomContext) {
     const uuidOne = uuidV4();
 
     const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
@@ -123,7 +124,7 @@ export class ClaimsService {
   /**
    *Replies with a paginator containing all claims.
    */
-  async getListClaims(context: Context) {
+  async getListClaims(context: CustomContext) {
     const uuidOne = uuidV4();
 
     const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
@@ -252,10 +253,10 @@ export class ClaimsService {
           );
           break;
         default:
-          keyboard.push([Buttons.failedCallSMSButton(user)]);
+          keyboard.push([Buttons.failedCallSMSButton(claim)]);
           keyboard.push([
-            Buttons.closeClaimButton(user),
-            Buttons.returnClaimButton(user),
+            Buttons.closeClaimButton(claim),
+            Buttons.returnClaimButton(claim),
           ]);
       }
     }
@@ -289,7 +290,7 @@ export class ClaimsService {
   }
 
   /**Returns claim with specified number. */
-  async getClaim(context: Context, claimNo: number) {
+  async getClaim(context: CustomContext, claimNo: number) {
     const uuidOne = uuidV4();
 
     const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
@@ -355,13 +356,13 @@ export class ClaimsService {
         case 20:
           keyboard.push([Buttons.takeWorkButton(data)]);
           break;
-        case 666:
+        case undefined:
           this.logger.warn(
             `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data, null, 3)}`,
           );
           break;
         default:
-          keyboard.push([Buttons.failedCallSMSButton(user)]);
+          keyboard.push([Buttons.failedCallSMSButton(data)]);
           keyboard.push([
             Markup.button.callback(
               'Логин и пароль',
@@ -375,13 +376,15 @@ export class ClaimsService {
             ),
           ]);
           keyboard.push([
-            Buttons.closeClaimButton(user),
-            Buttons.returnClaimButton(user),
+            Buttons.closeClaimButton(data),
+            Buttons.returnClaimButton(data),
           ]);
       }
 
       keyboard.push([Buttons.getShortClaimsButton('К списку')]);
       replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+
+      this.bot.context.claimData = data;
 
       try {
         await context.editMessageText(page, {
@@ -411,7 +414,7 @@ export class ClaimsService {
     }
   }
 
-  async help(context: Context) {
+  async help(context: CustomContext) {
     const page =
       `Help\n` +
       `1. Бери заявку в работу.\n` +
@@ -426,7 +429,7 @@ export class ClaimsService {
     await context.reply(page, replyMarkup);
   }
 
-  async cancel(context: Context) {
+  async cancel(context: CustomContext) {
     if (process.argv.includes('dev')) {
       this.logger.log(
         `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
@@ -444,7 +447,7 @@ export class ClaimsService {
     });
   }
 
-  async claimAction(context: Context) {
+  async claimAction(context: CustomContext) {
     const uuidOne = uuidV4();
 
     if (process.argv.includes('dev')) {
@@ -464,11 +467,9 @@ export class ClaimsService {
       action = [0, 0, 'complete'];
     }
 
-    // this.httpService.post()
-
     switch (action[2]) {
       case 'takework':
-        const response = await this.actionMakePostReq(
+        let response = await this.actionMakePostReq(
           uuidOne,
           action,
           user,
@@ -498,6 +499,62 @@ export class ClaimsService {
             `Обратитесь к администратору или повторите попытку позже.`;
           page = ClaimsUtils.getMarkdownV2Shielded(page);
         }
+        break;
+      case 'complete':
+      case 'return':
+      case 'addcomment':
+        let comment;
+        try {
+          comment = context.update?.['message'].text;
+        } catch {
+          keyboard = [[Markup.button.callback('Отмена', `clgt_${action[4]}`)]];
+
+          switch (action[2]) {
+            case 'complete':
+              page = 'Для завершения заявки обязательно укажите комментарий';
+              break;
+            case 'return':
+              page = 'Для возврата заявки обязательно укажите комментарий';
+              break;
+            case 'addcomment':
+              page = 'Укажите комментарий';
+              break;
+            default:
+              page = 'Что то пошло не так';
+          }
+
+          const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+          await context.editMessageText(page, {
+            reply_markup: replyMarkup,
+            parse_mode: 'MarkdownV2',
+          });
+
+          this.logger.log(
+            `DEBBUG: context.claim = action; context.chat_data.claim_data = ${this.bot.context?.['claimData']}`,
+          );
+          this.logger.log(
+            `DEBBUG: context.claim = action; update = ${context.update}`,
+          );
+          return;
+        }
+        // const claim_data = this.bot.context?.['claimData'];
+        // action = {};
+
+        response = await this.actionMakePostReq(
+          uuidOne,
+          action,
+          user,
+          url,
+          requestConfig,
+        );
+
+        try {
+          this.logger.log(
+            `DEBBUG context.bot.deleteMessage Trying: message_id = ${context.update?.['']}`,
+          );
+        } catch {}
+
+        return;
     }
 
     const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
@@ -542,7 +599,7 @@ export class ClaimsService {
         data['options'] = { contract: clientContract };
     }
 
-    // requestConfig['Content-Type'] = 'application/json';
+    requestConfig['Content-Type'] = 'application/json';
     // requestConfig['Content-Length'] = data.length;
 
     let response, res;
