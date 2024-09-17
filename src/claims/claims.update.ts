@@ -1,4 +1,4 @@
-import { Action, Ctx, Hears, Help, Start, Update } from 'nestjs-telegraf';
+import { Action, Ctx, Hears, Help, Start, Update, On } from 'nestjs-telegraf';
 import { CustomContext } from 'src/interfaces/context.interface';
 import { ClaimsService } from './claims.service';
 
@@ -33,7 +33,6 @@ export class ClaimsUpdate {
 
   @Action(/^clgt_/)
   async getClaim(@Ctx() ctx: CustomContext) {
-    console.log(ctx.update?.['callback_query'].data);
     const claimNo = parseInt(
       ctx.update?.['callback_query'].data.replace('clgt_', ''),
     );

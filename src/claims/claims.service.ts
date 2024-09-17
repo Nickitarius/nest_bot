@@ -40,6 +40,7 @@ export class ClaimsService {
       );
     } catch (error) {
       ClaimsUtils.handleAxiosError(error, uuidOne, context, user, this.logger);
+      context.scene.enter('START');
       return;
     }
     const data = response.data;
@@ -103,6 +104,7 @@ export class ClaimsService {
         );
       }
 
+      context.scene.enter('START');
       return;
     }
 
@@ -159,6 +161,7 @@ export class ClaimsService {
           this.logger,
         );
 
+        context.scene.enter('START');
         return;
       }
       data = response.data;
@@ -199,6 +202,7 @@ export class ClaimsService {
         );
       }
 
+      context.scene.enter('START');
       return;
     }
 
@@ -339,6 +343,7 @@ export class ClaimsService {
           this.logger,
         );
 
+        context.scene.enter('START');
         return;
       }
       data = response.data;
@@ -384,7 +389,7 @@ export class ClaimsService {
       keyboard.push([Buttons.getShortClaimsButton('К списку')]);
       replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
-      this.bot.context.claimData = data;
+      context.claimData = data;
 
       try {
         await context.editMessageText(page, {
@@ -529,12 +534,17 @@ export class ClaimsService {
             parse_mode: 'MarkdownV2',
           });
 
+          context.claimData = action;
+
           this.logger.log(
-            `DEBBUG: context.claim = action; context.chat_data.claim_data = ${this.bot.context?.['claimData']}`,
+            `DEBBUG: context.claim = action; context.chat_data.claim_data = ${context.claimData}`,
           );
           this.logger.log(
             `DEBBUG: context.claim = action; update = ${context.update}`,
           );
+
+          context.scene.enter('COMMENT');
+          // context.
           return;
         }
         // const claim_data = this.bot.context?.['claimData'];
@@ -554,6 +564,7 @@ export class ClaimsService {
           );
         } catch {}
 
+        context.scene.enter('START');
         return;
     }
 
