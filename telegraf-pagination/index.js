@@ -46,11 +46,11 @@ class Pagination {
     }
     this.pageSize = pageSize;
     this.rowSize = rowSize;
-    this.currentPage = currentPage;
+    // this.currentPage = currentPage;
     this.onSelect = onSelect;
     this.format = format;
     this.header = header;
-    this.messages = messages;
+    // this.messages = messages;
     this.total = this.lazy ? (total ?? Infinity) : this.data.length;
     this.totalPages = Math.ceil(this.total / this.pageSize);
     this.currentPage =
@@ -59,9 +59,9 @@ class Pagination {
         : 1;
     this.isButtonsMode = isButtonsMode;
     this.isEnabledDeleteButton = isEnabledDeleteButton;
-    this.format = format;
-    this.header = header;
-    this.onSelect = onSelect;
+    // this.format = format;
+    // this.header = header;
+    // this.onSelect = onSelect;
     this.messages = Object.assign(this.defaultMessages, messages);
     this.inlineCustomButtons = inlineCustomButtons;
     this.buttonModeOptions = Object.assign(

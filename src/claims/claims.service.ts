@@ -1,111 +1,50 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { AxiosError } from 'axios';
-import { catchError, firstValueFrom } from 'rxjs';
-import { Context, Markup, Telegraf } from 'telegraf';
-import { v4 as uuidV4 } from 'uuid';
 import * as fs from 'fs';
-import { Pagination } from '../../telegraf-pagination';
 import { InjectBot } from 'nestjs-telegraf';
-// import { inlineKeyboard } from 'telegraf/typings/markup';
-
-/**
- * Returns string with all characters incompatible
- with Telegram's MarkdonwnV2 shielded.*/
-function getMarkdownV2Shielded(string: string): string {
-  return (
-    string
-      .replace(/\_/g, '\\_')
-      // .replace(/\*/g, '\\*')
-      .replace(/\[/g, '\\[')
-      .replace(/\]/g, '\\]')
-      .replace(/\(/g, '\\(')
-      .replace(/\)/g, '\\)')
-      .replace(/\~/g, '\\~')
-      .replace(/\`/g, '\\`')
-      .replace(/\>/g, '\\>')
-      .replace(/\#/g, '\\#')
-      .replace(/\+/g, '\\+')
-      .replace(/\-/g, '\\-')
-      .replace(/\=/g, '\\=')
-      .replace(/\|/g, '\\|')
-      .replace(/\{/g, '\\{')
-      .replace(/\}/g, '\\}')
-      .replace(/\./g, '\\.')
-      .replace(/\!/g, '\\!')
-  );
-}
+import { catchError, firstValueFrom } from 'rxjs';
+import { Markup, Telegraf } from 'telegraf';
+import { transliterate } from 'transliteration';
+import { v4 as uuidV4 } from 'uuid';
+import { Pagination } from '../../telegraf-pagination';
+import { Buttons } from './buttons';
+import { ClaimsUtils } from './utils';
+import { CustomContext } from 'src/interfaces/context.interface';
 
 @Injectable()
 export class ClaimsService {
   constructor(
     private readonly httpService: HttpService,
-    @InjectBot() private bot: Telegraf<Context>,
+    @InjectBot() private bot: Telegraf<CustomContext>,
   ) {}
   private readonly logger = new Logger(ClaimsService.name);
+  private apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims`;
 
-  echo(text: string): string {
-    return `Echo: ${text}`;
-  }
-
-  async getShortClaims(context: Context) {
+  async getShortClaims(context: CustomContext) {
     const uuidOne = uuidV4();
 
-    let user, query;
-    try {
-      query = context.callbackQuery;
-      user = query.from;
-    } catch {
-      query = context.update?.['message'];
-      user = query.from;
-    }
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
+    const url = this.apiClaims + `?uid=${user.id}`;
 
-    const apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims?uid=${user.id}`;
-    const requestConfig = {
-      auth: {
-        username: process.env.API_USER,
-        password: process.env.API_PASS,
-      },
-    };
-
-    let response;
-    let keyboard, replyMarkup;
+    let keyboard, replyMarkup, response;
 
     try {
-      this.logger.log(`${user.id}(${user.username}) Request ${apiClaims}`);
+      this.logger.log(`${user.id}(${user.username}) Request ${url}`);
       response = await firstValueFrom(
-        this.httpService.get(apiClaims, requestConfig).pipe(
+        this.httpService.get(url, requestConfig).pipe(
           catchError((error: AxiosError) => {
-            throw error.response.data;
+            throw error;
           }),
         ),
       );
     } catch (error) {
-      this.logger.error(
-        `UUID: ${uuidOne} USER_ID: ${user.id} CODE: ${error.statusCode} DATA: ${JSON.stringify(error)}`,
-      );
-
-      keyboard = [
-        Markup.button.callback('Попробовать снова', 'getShortClaims'),
-      ];
-      replyMarkup = Markup.inlineKeyboard(keyboard);
-
-      try {
-        await context.editMessageText(
-          `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
-          replyMarkup,
-        );
-      } catch {
-        await context.reply(
-          `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
-          replyMarkup,
-        );
-      }
-
+      ClaimsUtils.handleAxiosError(error, uuidOne, context, user, this.logger);
+      context.scene.enter('START_SCENE');
       return;
     }
-
     const data = response.data;
+
     let page;
 
     if (data.length != 0) {
@@ -135,6 +74,8 @@ export class ClaimsService {
         if (assigned == null) {
           assigned = claim.assigned;
         }
+
+        keyboard.push([Buttons.getClaimButton(claim)]);
       });
 
       page =
@@ -145,12 +86,10 @@ export class ClaimsService {
         `*Исполнитель*: ${assigned}`;
     } else {
       this.logger.log(
-        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
+        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data, null, 3)}`,
       );
 
-      keyboard = [
-        Markup.button.callback('Попробовать снова', 'getShortClaims'),
-      ];
+      keyboard = [Buttons.getShortClaimsButton('Попробовать снова')];
       replyMarkup = Markup.inlineKeyboard(keyboard);
 
       try {
@@ -165,108 +104,64 @@ export class ClaimsService {
         );
       }
 
+      context.scene.enter('START_SCENE');
       return;
     }
 
-    replyMarkup = Markup.inlineKeyboard(keyboard);
+    replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
     try {
       await context.editMessageText(page, {
-        reply_markup: replyMarkup.reply_markup,
+        reply_markup: replyMarkup,
         parse_mode: 'MarkdownV2',
       });
     } catch {
       await context.reply(page, {
-        reply_markup: replyMarkup.reply_markup,
+        reply_markup: replyMarkup,
         parse_mode: 'MarkdownV2',
       });
     }
-
-    return;
   }
 
-  async help(context: Context) {
-    const page =
-      `Help\n` +
-      `1. Бери заявку в работу.\n` +
-      `2. Закрывай или возвращай обратно.\n` +
-      `3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.\n` +
-      `4. Можно по заявке узнать логин\\пароль для PPPOE.\n` +
-      `5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
-
-    const keyboard = [
-      Markup.button.callback('Загрузить заявки', 'getShortClaims'),
-    ];
-    const replyMarkup = Markup.inlineKeyboard(keyboard);
-
-    await context.reply(page, replyMarkup);
-  }
-
-  /**Replies with a paginator containing all claims.*/
-  async getListClaims(context: Context) {
+  /**
+   *Replies with a paginator containing all claims.
+   */
+  async getListClaims(context: CustomContext) {
     const uuidOne = uuidV4();
 
-    let user, query;
-    try {
-      query = context.callbackQuery;
-      user = query.from;
-    } catch {
-      query = context.update?.['message'];
-      user = query.from;
-    }
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
+    const url = this.apiClaims + `?uid=${user.id}`;
 
-    const apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims?uid=${user.id}`;
-    const requestConfig = {
-      auth: {
-        username: process.env.API_USER,
-        password: process.env.API_PASS,
-      },
-    };
+    let response, keyboard, replyMarkup, data;
 
-    let response;
-    let keyboard, replyMarkup;
-
-    let data;
     if (process.argv.includes('dev')) {
       this.logger.log(
-        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update)}\n####Update END####`,
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
       );
       data = JSON.parse(
-        fs.readFileSync('data/data_just_one_entry.json', 'utf-8'), //data_just_one_entry
+        fs.readFileSync('data/data.json', 'utf-8'), //data_just_one_entry
       );
     } else {
       try {
-        this.logger.log(`${user.id}(${user.username}) Request ${apiClaims}`);
+        this.logger.log(`${user.id}(${user.username}) Request ${url}`);
 
         response = await firstValueFrom(
-          this.httpService.get(apiClaims, requestConfig).pipe(
+          this.httpService.get(url, requestConfig).pipe(
             catchError((error: AxiosError) => {
-              throw error.response.data;
+              throw error;
             }),
           ),
         );
       } catch (error) {
-        this.logger.error(
-          `UUID: ${uuidOne} USER_ID: ${user.id} CODE: ${error.statusCode} DATA: ${JSON.stringify(error)}`,
+        ClaimsUtils.handleAxiosError(
+          error,
+          uuidOne,
+          context,
+          user,
+          this.logger,
         );
 
-        keyboard = [
-          Markup.button.callback('Попробовать снова', 'getShortClaims'),
-        ];
-        replyMarkup = Markup.inlineKeyboard(keyboard);
-
-        try {
-          await context.editMessageText(
-            `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
-            replyMarkup,
-          );
-        } catch {
-          await context.reply(
-            `Что то пошло не так:\nUUID: ${uuidOne}\nUSER_ID: {user.id}\nCODE: ${error.statusCode}\nDATA: ${error.message}\n\nОбратитесь к администратору`,
-            replyMarkup,
-          );
-        }
-
+        context.scene.enter('START_SCENE');
         return;
       }
       data = response.data;
@@ -281,47 +176,18 @@ export class ClaimsService {
       let tmpClaim;
 
       data.claims.forEach((claim) => {
-        claim.claim_addr = claim.claim_addr.replaceAll('_', '-');
-        claim.claim_date = claim.claim_date.replaceAll('_', '-');
-        claim.client_contract = claim.client_contract.replaceAll('_', '-');
-        claim.client_name = claim.client_name.replaceAll('_', '-');
-        claim.claim_phone = claim.claim_phone.replaceAll('_', '-');
-        claim.autor = claim.autor.replaceAll('_', '-');
-        claim.assigned = claim.assigned.replaceAll('_', '-');
-        claim.comment = claim.comment.replaceAll('_', '-');
-
-        if (claim.work_commentary != undefined) {
-          claim.work_commentary = claim.work_commentary.replaceAll('_', '-');
-        }
-        if (claim.status_name != undefined) {
-          claim.status_name = claim.status_name.replaceAll('_', '-');
-        }
+        tmpClaim = ClaimsUtils.formClaimDescription(claim);
 
         claimsNumbers.push(claim.claim_no);
 
-        tmpClaim =
-          `*Обращениe №:* ${claim.claim_no}\n` +
-          `*Статус:* ${claim.status_name}\n` +
-          `*Дата:* ${claim.claim_date}\n` +
-          `*Договор:* ${claim.client_contract}\n` +
-          `*Телефон:* ${claim.claim_phone}\n` +
-          `*Имя:* ${claim.client_name}\n` +
-          `*Адрес:* ${claim.claim_addr}\n` +
-          `*Инициатор:* ${claim.autor}\n` +
-          `*Исполнитель:* ${claim.assigned}\n` +
-          `*Комментарий к заявке:* ${claim.comment}\n` +
-          `*Комментарий к работе:* ${claim.work_commentary}\n\n`;
-
-        claims.push(getMarkdownV2Shielded(tmpClaim));
+        claims.push(ClaimsUtils.getMarkdownV2Shielded(tmpClaim));
       });
     } else {
       this.logger.log(
-        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data)}`,
+        `UUIF: ${uuidOne}; User: ${user.id}${user.username}; Not a single claim; data = ${JSON.stringify(data, null, 3)}`,
       );
 
-      keyboard = [
-        Markup.button.callback('Попробовать снова', 'getShortClaims'),
-      ];
+      keyboard = [Buttons.getShortClaimsButton('Попробовать снова')];
       replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
       try {
@@ -336,6 +202,7 @@ export class ClaimsService {
         );
       }
 
+      context.scene.enter('START_SCENE');
       return;
     }
 
@@ -368,7 +235,7 @@ export class ClaimsService {
         this.getClaim(context, item.claimNo);
       },
       parse_mode: 'MarkdownV2',
-      inlineCustomButtons: [[Markup.button.callback('Выход', 'cancel')]],
+      inlineCustomButtons: [Buttons.cancelButton],
       isEnablePageButtons: true,
     });
 
@@ -382,39 +249,23 @@ export class ClaimsService {
       switch (claim.id) {
         case 10:
         case 20:
-          customButtons.push([
-            Markup.button.callback(
-              'В работу',
-              `cl_action_takework_${claim.id}_${claim.claim_no}_${claim.claim_phone}`,
-            ),
-          ]);
+          customButtons.push([Buttons.takeWorkButton(claim)]);
           break;
         case 666:
           this.logger.warn(
-            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data)}`,
+            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data, null, 3)}`,
           );
           break;
         default:
+          keyboard.push([Buttons.failedCallSMSButton(claim)]);
           keyboard.push([
-            Markup.button.callback(
-              'SMS о недозвоне',
-              `cl_action_senddefsms_${user.id}_${user.username}_${user.claim_phone}`,
-            ),
-          ]);
-          keyboard.push([
-            Markup.button.callback(
-              'Закрыть заявку',
-              `cl_action_complete_${user.id}_${user.username}_${user.claim_phone}`,
-            ),
-            Markup.button.callback(
-              'Вернуть заявку',
-              `cl_action_return_${user.id}_${user.username}_${user.claim_phone}`,
-            ),
+            Buttons.closeClaimButton(claim),
+            Buttons.returnClaimButton(claim),
           ]);
       }
     }
 
-    customButtons.push([Markup.button.callback('Выход', 'cancel')]);
+    customButtons.push([Buttons.cancelButton]);
 
     paginator.inlineCustomButtons = customButtons;
 
@@ -442,8 +293,485 @@ export class ClaimsService {
     paginator.handleActions(this.bot);
   }
 
-  async getClaim(context: Context, claimNo: number) {
-    console.log(claimNo);
-    // console.log(context);
+  /**Returns claim with specified number. */
+  async getClaim(context: CustomContext, claimNo: number) {
+    const uuidOne = uuidV4();
+
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
+
+    const url = this.apiClaims + `/${claimNo}?uid=${user.id}`;
+
+    let data, replyMarkup, response;
+    let keyboard = [];
+
+    if (process.argv.includes('dev')) {
+      this.logger.log(
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
+      );
+      data = JSON.parse(
+        fs.readFileSync('data/data.json', 'utf-8'), //data_just_one_entry
+      );
+      let hasRequiredClaim = false;
+      for (const claim of data.claims) {
+        if (claim.claim_no === claimNo) {
+          data = claim;
+          hasRequiredClaim = true;
+          break;
+        }
+      }
+      if (!hasRequiredClaim) {
+        this.logger.log(
+          `claimIndex not found.\nclaim_no : ${claimNo}\ndata: ${JSON.stringify(data, null, 3)}`,
+        );
+      }
+    } else {
+      try {
+        this.logger.log(`${user.id}(${user.username}) Request ${url}`);
+        response = await firstValueFrom(
+          this.httpService.get(url, requestConfig).pipe(
+            catchError((error: AxiosError) => {
+              throw error;
+            }),
+          ),
+        );
+      } catch (error) {
+        ClaimsUtils.handleAxiosError(
+          error,
+          uuidOne,
+          context,
+          user,
+          this.logger,
+        );
+
+        context.scene.enter('START_SCENE');
+        return;
+      }
+      data = response.data;
+    }
+
+    if (data != undefined) {
+      let page = ClaimsUtils.formClaimDescription(data);
+      page = ClaimsUtils.getMarkdownV2Shielded(page);
+
+      switch (data.status_id) {
+        case 10:
+        case 20:
+          keyboard.push([Buttons.takeWorkButton(data)]);
+          break;
+        case undefined:
+          this.logger.warn(
+            `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data, null, 3)}`,
+          );
+          break;
+        default:
+          keyboard.push([Buttons.failedCallSMSButton(data)]);
+          keyboard.push([Buttons.getAccountButton(data)]);
+          keyboard.push([Buttons.addCommentButton(data)]);
+          keyboard.push([
+            Buttons.closeClaimButton(data),
+            Buttons.returnClaimButton(data),
+          ]);
+      }
+
+      keyboard.push([Buttons.getShortClaimsButton('К списку')]);
+      replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+
+      context.claimData = data;
+
+      try {
+        await context.editMessageText(page, {
+          reply_markup: replyMarkup,
+          parse_mode: 'MarkdownV2',
+        });
+      } catch {
+        this.logger.debug(`DEBBUG: ${page}\n ${replyMarkup}`);
+        await context.reply(page, {
+          reply_markup: replyMarkup,
+          parse_mode: 'MarkdownV2',
+        });
+      }
+    } else {
+      this.logger.warn(
+        `Couldn't get claim; data = ${JSON.stringify(data, null, 3)}`,
+      );
+      keyboard = [
+        [Buttons.getShortClaimsButton('К списку'), Buttons.cancelButton],
+      ];
+      replyMarkup = Markup.inlineKeyboard(keyboard);
+      try {
+        await context.editMessageText('Что то пошло не так :(', replyMarkup);
+      } catch {
+        await context.reply('Что то пошло не так :(', replyMarkup);
+      }
+    }
+  }
+
+  async claimAction(context: CustomContext) {
+    const uuidOne = uuidV4();
+
+    if (process.argv.includes('dev')) {
+      this.logger.log(
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
+      );
+    }
+
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
+    const url = `${this.apiClaims}/action?uid=${user.id}`;
+
+    let keyboard, action, page, response;
+
+    if (context.callbackQuery) {
+      action = context.callbackQuery?.['data'].split('_');
+      context.session['action'] = action;
+    } else if (context.session['action']) {
+      action = context.session['action'];
+    } else {
+      action = [0, 0, 'complete'];
+    }
+
+    switch (action[2]) {
+      case 'takework':
+        response = await this.actionMakePostReq(
+          uuidOne,
+          action,
+          user,
+          url,
+          requestConfig,
+        );
+        if (response.status == 0) {
+          this.logger.log(
+            `TAKEWORK: ${uuidOne}; ${action[4]}, ${JSON.stringify(user, null, 3)}; ${response['response']}`,
+          );
+
+          keyboard = [[Markup.button.callback('OK', `clgt_${action[4]}`)]];
+          page = 'Заявка взята в работу';
+        } else {
+          this.logger.error(
+            `TAKEWORK ERROR: ${uuidOne}; ${action[4]}, ${user}; ${JSON.stringify(response['error'], null, 3)};\
+             DATASEND: ${JSON.stringify(response['datasend'], null, 3)}; DATAREAD: ${JSON.stringify(response['dataread'], null, 3)}`,
+          );
+
+          keyboard = [[Markup.button.callback('OK', `clgt_${action[4]}`)]];
+
+          page =
+            `*${JSON.stringify(response['datasend'], null, 3)}*\n\n` +
+            `${JSON.stringify(response['error'], null, 3)}\n` +
+            `Type: ${action[2]}\nClaim: ${action[4]}\nUser Id: ${user.id}\n` +
+            `UUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже.`;
+          page = ClaimsUtils.getMarkdownV2Shielded(page);
+        }
+        break;
+      case 'complete':
+      case 'return':
+      case 'addcomment':
+        let comment;
+        try {
+          comment = context.update?.['message'].text;
+        } catch {
+          keyboard = [[Markup.button.callback('Отмена', `clgt_${action[4]}`)]];
+
+          switch (action[2]) {
+            case 'complete':
+              page = 'Для завершения заявки обязательно укажите комментарий';
+              break;
+            case 'return':
+              page = 'Для возврата заявки обязательно укажите комментарий';
+              break;
+            case 'addcomment':
+              page = 'Укажите комментарий';
+              break;
+            default:
+              page = 'Что то пошло не так';
+          }
+
+          const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+          await context.editMessageText(page, {
+            reply_markup: replyMarkup,
+            parse_mode: 'MarkdownV2',
+          });
+
+          context.claimData = action;
+
+          this.logger.log(
+            `DEBBUG: context.claim = action; context.chat_data.claim_data = ${context.claimData}`,
+          );
+          this.logger.log(
+            `DEBBUG: context.claim = action; update = ${context.update}`,
+          );
+
+          context.scene.enter('COMMENT_SCENE');
+          return;
+        }
+
+        action.push(comment);
+        response = await this.actionMakePostReq(
+          uuidOne,
+          action,
+          user,
+          url,
+          requestConfig,
+        );
+
+        try {
+          this.logger.log(
+            `DEBBUG context.bot.deleteMessage Trying: message_id = ${context.update?.['message'].message_id}`,
+          );
+          await context.deleteMessage(context.update?.['message'].message_id);
+        } catch {
+          this.logger.error(
+            `message_id = ${context.update?.['message'].message_id}`,
+          );
+          this.logger.error(JSON.stringify(context.claimData, null, 3));
+          this.logger.error(JSON.stringify(context.update, null, 3));
+        }
+
+        delete context.claimData;
+        delete context.session['action'];
+
+        if (response.status === 0) {
+          this.logger.log(
+            `${action[2]}; ${uuidOne}; ${action[4]}; ${user}; ${response.response}`,
+          );
+          keyboard = [[Buttons.getShortClaimsButton('OK')]];
+
+          switch (action[2]) {
+            case 'complete':
+              page = `Заявка ${action[4]} завершена\nКомментарий: ${comment}`;
+              break;
+            case 'return':
+              page = `Заявка ${action[4]} возвращена\nКомментарий: ${comment}`;
+              break;
+            case 'addcomment':
+              page = `Коментарий отправлен.\nНомер заявки ${action[4]}\nКомментарий: ${comment}`;
+              break;
+            default:
+              page = 'Что-то пошло не так';
+          }
+          page = ClaimsUtils.getMarkdownV2Shielded(page);
+          const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+
+          await context.reply(page, {
+            reply_markup: replyMarkup,
+            parse_mode: 'MarkdownV2',
+          });
+
+          context.scene.enter('START_SCENE');
+          return;
+        } else {
+          this.logger.log(
+            `${action[2]} ERROR: ${uuidOne}; ${action[4]}; ${JSON.stringify(user, null, 3)}; ` +
+              `${response.error}; DATASEND: ${response.datasend}; DATAREAD: ${response.dataread}`,
+          );
+          keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
+          page =
+            `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
+            `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже`;
+        }
+
+        page = ClaimsUtils.getMarkdownV2Shielded(page);
+        const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+        await context.reply(page, {
+          reply_markup: replyMarkup,
+          parse_mode: 'MarkdownV2',
+        });
+        context.scene.enter('START_SCENE');
+        return;
+        break;
+      case 'senddefsms':
+        response = await this.actionMakePostReq(
+          uuidOne,
+          action,
+          user,
+          url,
+          requestConfig,
+        );
+
+        if (response.status === 0) {
+          this.logger.log(
+            `SENDDEFSMS: ${uuidOne}; ${action[4]}; ` +
+              `${JSON.stringify(user, null, 3)}; ${response.response}`,
+          );
+          page = 'СМС отправлено';
+        } else {
+          this.logger.error(
+            `SENDDEFSMS ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
+              `${response.error}; DATASEND: ${response.datasend}; ` +
+              `DATAREAD: ${response.dataread}`,
+          );
+          page =
+            `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
+            `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже`;
+        }
+        break;
+      case 'comment':
+        if (response.status === 0) {
+          page = 'Функция в стадии разработки.';
+        } else {
+          this.logger.error(
+            `COMMENT ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
+              `${response.error}; DATASEND: ${response.datasend}; ` +
+              `DATAREAD: ${response.dataread}`,
+          );
+          page =
+            `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
+            `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже`;
+        }
+        keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
+        break;
+      case 'getaccounts':
+        response = await this.actionMakePostReq(
+          uuidOne,
+          action,
+          user,
+          url,
+          requestConfig,
+        );
+
+        if (response.status === 0) {
+          this.logger.log(
+            `SENDDEFSMS: ${uuidOne}; ${action[4]}; ` +
+              `${JSON.stringify(user, null, 3)}; ${response.response}`,
+          );
+          page = '***Учётные данные***\n\n';
+          const data = response.response;
+          if (data.length != 0) {
+            for (const account of data) {
+              account.tarplan_name = account.tarplan_name.replaceAll('_', '-');
+              account.status_name = account.status_name.replaceAll('_', '-');
+
+              page +=
+                `*Аккаунт код*:  ${account.account_code}` +
+                `\n*Статус*:  ${account.status_name}\n` +
+                `*Тарифный план*: ${account.tarplan_name}\n` +
+                `*Логин*: ${account.login}\n` +
+                `*Пароль*: ${account.password}\n\n`;
+            }
+            page = ClaimsUtils.getMarkdownV2Shielded(page);
+          }
+        } else {
+          this.logger.error(
+            `GETACCOUNTS ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
+              `${response.error}; DATASEND: ${response.datasend}; ` +
+              `DATAREAD: ${response.dataread}`,
+          );
+          page =
+            `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
+            `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже`;
+        }
+        keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
+        break;
+      default:
+    }
+
+    const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+
+    await context.editMessageText(page, {
+      reply_markup: replyMarkup,
+      parse_mode: 'MarkdownV2',
+    });
+  }
+
+  /**Makes a POST request to the API server. Returns status and response. */
+  async actionMakePostReq(uuidOne, action, user, url, requestConfig) {
+    let data;
+    data = {
+      id: uuidOne,
+      type: action[2],
+      claim_id: action[3],
+      claim_no: action[4],
+      username: user.username,
+      first_name: user.first_name,
+      user_id: user.user_id,
+    };
+
+    switch (action[2]) {
+      case 'complete':
+      case 'return':
+      case 'addcomment':
+        data['commentary'] = action[7];
+        break;
+      case 'senddefsms':
+        data['options'] = { phone: action[5], def_id: 1 };
+        break;
+      case 'getaccounts':
+        const clientContract = transliterate(action[6]);
+        data = {
+          id: uuidOne,
+          type: action[2],
+          user_id: user.user_id,
+        };
+        data['options'] = { contract: clientContract };
+    }
+
+    requestConfig['Content-Type'] = 'application/json';
+    // requestConfig['Content-Length'] = data.length;
+
+    let response, res;
+    try {
+      response = await firstValueFrom(
+        this.httpService.post(url, data, requestConfig).pipe(
+          catchError((error: AxiosError) => {
+            throw error;
+          }),
+        ),
+      );
+    } catch (error) {
+      if (error.response) {
+        res = {
+          status: 1,
+          datasend: JSON.stringify(data, null, 3),
+          dataread: error.message,
+          error: error.response.data.statusCode,
+        };
+      } else {
+        res = {
+          status: 1,
+          datasend: JSON.stringify(data, null, 3),
+          error: error.code,
+        };
+      }
+
+      return res;
+    }
+    res = { status: 0, response: response };
+    return res;
+  }
+
+  async help(context: CustomContext) {
+    const page =
+      `Help\n` +
+      `1. Бери заявку в работу.\n` +
+      `2. Закрывай или возвращай обратно.\n` +
+      `3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.\n` +
+      `4. Можно по заявке узнать логин\\пароль для PPPOE.\n` +
+      `5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
+
+    const keyboard = [Buttons.getShortClaimsButton('Загрузить заявки')];
+    const replyMarkup = Markup.inlineKeyboard(keyboard);
+
+    await context.reply(page, replyMarkup);
+  }
+
+  async cancel(context: CustomContext) {
+    if (process.argv.includes('dev')) {
+      this.logger.log(
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
+      );
+    }
+
+    const keyboard = Markup.inlineKeyboard([
+      [Buttons.getShortClaimsButton('Загрузить заявки')],
+    ]);
+    const replyMarkup = keyboard.reply_markup;
+
+    await context.editMessageText('Доброго дня\\!', {
+      reply_markup: replyMarkup,
+      parse_mode: 'MarkdownV2',
+    });
   }
 }
