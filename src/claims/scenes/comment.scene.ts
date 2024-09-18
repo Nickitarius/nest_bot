@@ -19,8 +19,8 @@ export class CommentScene {
   @On('text')
   async readComment(@Ctx() context: CustomContext) {
     console.log('text!');
-    console.log(context.update?.['message']);
-
-    await this.claimsService.readComment(context);
+    console.log(context.session);
+    // await this.claimsService.readComment(context);
+    await this.claimsService.claimAction(context);
   }
 }

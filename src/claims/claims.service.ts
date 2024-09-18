@@ -24,8 +24,6 @@ export class ClaimsService {
   async getShortClaims(context: CustomContext) {
     const uuidOne = uuidV4();
 
-    console.log(context);
-
     const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
     const url = this.apiClaims + `?uid=${user.id}`;
 
@@ -421,39 +419,6 @@ export class ClaimsService {
     }
   }
 
-  async help(context: CustomContext) {
-    const page =
-      `Help\n` +
-      `1. Бери заявку в работу.\n` +
-      `2. Закрывай или возвращай обратно.\n` +
-      `3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.\n` +
-      `4. Можно по заявке узнать логин\\пароль для PPPOE.\n` +
-      `5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
-
-    const keyboard = [Buttons.getShortClaimsButton('Загрузить заявки')];
-    const replyMarkup = Markup.inlineKeyboard(keyboard);
-
-    await context.reply(page, replyMarkup);
-  }
-
-  async cancel(context: CustomContext) {
-    if (process.argv.includes('dev')) {
-      this.logger.log(
-        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
-      );
-    }
-
-    const keyboard = Markup.inlineKeyboard([
-      [Buttons.getShortClaimsButton('Загрузить заявки')],
-    ]);
-    const replyMarkup = keyboard.reply_markup;
-
-    await context.editMessageText('Доброго дня\\!', {
-      reply_markup: replyMarkup,
-      parse_mode: 'MarkdownV2',
-    });
-  }
-
   async claimAction(context: CustomContext) {
     const uuidOne = uuidV4();
 
@@ -466,17 +431,20 @@ export class ClaimsService {
     const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
     const url = `${this.apiClaims}/action?uid=${user.id}`;
 
-    let keyboard, action, page;
+    let keyboard, action, page, response;
 
-    try {
+    if (context.callbackQuery) {
       action = context.callbackQuery?.['data'].split('_');
-    } catch {
+      context.session['action'] = action;
+    } else if (context.session['action']) {
+      action = context.session['action'];
+    } else {
       action = [0, 0, 'complete'];
     }
 
     switch (action[2]) {
       case 'takework':
-        let response = await this.actionMakePostReq(
+        response = await this.actionMakePostReq(
           uuidOne,
           action,
           user,
@@ -546,13 +514,10 @@ export class ClaimsService {
           );
 
           context.scene.enter('COMMENT_SCENE');
-          // context.
           return;
         }
-        // const claim_data = this.bot.context?.['claimData'];
-        // action = {};
-        action.push(comment);
 
+        action.push(comment);
         response = await this.actionMakePostReq(
           uuidOne,
           action,
@@ -574,8 +539,8 @@ export class ClaimsService {
           this.logger.error(JSON.stringify(context.update, null, 3));
         }
 
-        // try{}
         delete context.claimData;
+        delete context.session['action'];
 
         if (response.status === 0) {
           this.logger.log(
@@ -597,7 +562,7 @@ export class ClaimsService {
               page = 'Что-то пошло не так';
           }
           page = ClaimsUtils.getMarkdownV2Shielded(page);
-          const replyMarkup = Markup.keyboard(keyboard).reply_markup;
+          const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
           await context.reply(page, {
             reply_markup: replyMarkup,
@@ -611,7 +576,7 @@ export class ClaimsService {
             `${action[2]} ERROR: ${uuidOne}; ${action[4]}; ${JSON.stringify(user, null, 3)}; ` +
               `${response.error}; DATASEND: ${response.datasend}; DATAREAD: ${response.dataread}`,
           );
-          keyboard = [Buttons.getClaimButton(context.claimData, 'OK')];
+          keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
           page =
             `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
             `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
@@ -637,12 +602,6 @@ export class ClaimsService {
       reply_markup: replyMarkup,
       parse_mode: 'MarkdownV2',
     });
-  }
-
-  async readComment(context: CustomContext) {
-    // const message = context.update?.['message'].text;
-
-    await this.claimAction(context);
   }
 
   /**Makes a POST request to the API server. Returns status and response. */
@@ -713,5 +672,38 @@ export class ClaimsService {
     }
     res = { status: 0, response: response };
     return res;
+  }
+
+  async help(context: CustomContext) {
+    const page =
+      `Help\n` +
+      `1. Бери заявку в работу.\n` +
+      `2. Закрывай или возвращай обратно.\n` +
+      `3. При недозвоне абоненту можно отправить СМС. Абонент уже не открутится что ему не звонили\\не приезжали.\n` +
+      `4. Можно по заявке узнать логин\\пароль для PPPOE.\n` +
+      `5. Заявку в работе можно завершить, но необходимо написать комментарий, что было устранено.`;
+
+    const keyboard = [Buttons.getShortClaimsButton('Загрузить заявки')];
+    const replyMarkup = Markup.inlineKeyboard(keyboard);
+
+    await context.reply(page, replyMarkup);
+  }
+
+  async cancel(context: CustomContext) {
+    if (process.argv.includes('dev')) {
+      this.logger.log(
+        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
+      );
+    }
+
+    const keyboard = Markup.inlineKeyboard([
+      [Buttons.getShortClaimsButton('Загрузить заявки')],
+    ]);
+    const replyMarkup = keyboard.reply_markup;
+
+    await context.editMessageText('Доброго дня\\!', {
+      reply_markup: replyMarkup,
+      parse_mode: 'MarkdownV2',
+    });
   }
 }

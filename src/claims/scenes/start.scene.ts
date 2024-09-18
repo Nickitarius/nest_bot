@@ -1,4 +1,4 @@
 import { Scene } from 'nestjs-telegraf';
 
 @Scene('START_SCENE')
-export class CommentScene {}
+export class StartScene {}
