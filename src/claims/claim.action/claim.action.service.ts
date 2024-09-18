@@ -28,8 +28,6 @@ export class ClaimActionService {
   async claimAction(context: CustomContext) {
     const uuidOne = uuidV4();
 
-    console.log(this.apiUrl);
-
     if (process.argv.includes('dev')) {
       this.logger.log(
         `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
@@ -262,7 +260,6 @@ export class ClaimActionService {
               `${JSON.stringify(user, null, 3)}; ${response.response}`,
           );
           page = '***Учётные данные***\n\n';
-          console.log(response.response);
           const data = response.response;
           if (data.length != 0) {
             for (const account of data) {

@@ -30,8 +30,6 @@ export class ClaimsService {
   async getShortClaims(context: CustomContext) {
     const uuidOne = uuidV4();
 
-    console.log(context.chat.id);
-
     const { user, requestConfig } = ClaimsUtils.getReqConfig(
       context,
       this.configService,
