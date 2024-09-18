@@ -353,9 +353,6 @@ export class ClaimsService {
       let page = ClaimsUtils.formClaimDescription(data);
       page = ClaimsUtils.getMarkdownV2Shielded(page);
 
-      const clientContract = transliterate(data.client_contract);
-      const tail = `${data.id}_${data.claim_no}_${data.claim_phone}_${clientContract}`;
-
       switch (data.status_id) {
         case 10:
         case 20:
@@ -368,18 +365,8 @@ export class ClaimsService {
           break;
         default:
           keyboard.push([Buttons.failedCallSMSButton(data)]);
-          keyboard.push([
-            Markup.button.callback(
-              'Логин и пароль',
-              `cl_action_getaccounts_${tail}`,
-            ),
-          ]);
-          keyboard.push([
-            Markup.button.callback(
-              'Комментарий',
-              `cl_action_addcomment_${tail}`,
-            ),
-          ]);
+          keyboard.push([Buttons.getAccountButton(data)]);
+          keyboard.push([Buttons.addCommentButton(data)]);
           keyboard.push([
             Buttons.closeClaimButton(data),
             Buttons.returnClaimButton(data),
@@ -518,7 +505,6 @@ export class ClaimsService {
         }
 
         action.push(comment);
-        console.log(action);
         response = await this.actionMakePostReq(
           uuidOne,
           action,
@@ -585,7 +571,7 @@ export class ClaimsService {
         }
 
         page = ClaimsUtils.getMarkdownV2Shielded(page);
-        let replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+        const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
         await context.reply(page, {
           reply_markup: replyMarkup,
           parse_mode: 'MarkdownV2',
@@ -714,8 +700,6 @@ export class ClaimsService {
         break;
       case 'getaccounts':
         const clientContract = transliterate(action[6]);
-        console.log('sssssssssssssss');
-        console.log(clientContract);
         data = {
           id: uuidOne,
           type: action[2],
@@ -736,8 +720,6 @@ export class ClaimsService {
           }),
         ),
       );
-      // console.log('rrrrrrrrrrrrrrrrrrrrrr');
-      // console.log(response);
     } catch (error) {
       if (error.response) {
         res = {
