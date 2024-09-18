@@ -7,7 +7,7 @@ import { catchError, firstValueFrom } from 'rxjs';
 import { CustomContext } from 'src/interfaces/context.interface';
 import { Markup, Telegraf } from 'telegraf';
 import { v4 as uuidV4 } from 'uuid';
-import { Pagination } from '../../telegraf-pagination';
+import { Pagination } from '../../lib/telegraf-pagination';
 import { Buttons } from './claims.buttons';
 import { ClaimsUtils } from './claims.utils';
 
