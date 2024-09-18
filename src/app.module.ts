@@ -3,12 +3,14 @@ import { ConfigModule } from '@nestjs/config';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { session } from 'telegraf';
 import { ClaimsModule } from './claims/claims.module';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ envFilePath: '.dev.env', isGlobal: true }),
+    ConfigModule.forRoot({
+      envFilePath: '.dev.env',
+      isGlobal: true,
+      cache: true,
+    }),
     TelegrafModule.forRoot({
       token: process.env.TOKEN,
       include: [ClaimsModule],
@@ -16,7 +18,7 @@ import { AppService } from './app.service';
     }),
     ClaimsModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  // controllers: [AppController],
+  // providers: [AppService],
 })
 export class AppModule {}

@@ -1,5 +1,6 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import * as fs from 'fs';
 import { InjectBot } from 'nestjs-telegraf';
@@ -16,17 +17,26 @@ export class ClaimsService {
   constructor(
     readonly httpService: HttpService,
     @InjectBot() readonly bot: Telegraf<CustomContext>,
-  ) {}
-  readonly logger = new Logger(ClaimsService.name);
-  readonly apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims`;
+    private configService: ConfigService,
+  ) {
+    const url = this.configService.get('API_URL');
+    const port = this.configService.get('API_PORT');
+    this.apiUrl = `http://${url}:${port}/claims`;
+  }
+  private readonly logger = new Logger(ClaimsService.name);
+
+  private readonly apiUrl;
 
   async getShortClaims(context: CustomContext) {
     const uuidOne = uuidV4();
 
     console.log(context.chat.id);
 
-    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
-    const url = this.apiClaims + `?uid=${user.id}`;
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(
+      context,
+      this.configService,
+    );
+    const url = this.apiUrl + `?uid=${user.id}`;
 
     let keyboard, replyMarkup, response;
 
@@ -130,8 +140,11 @@ export class ClaimsService {
   async getListClaims(context: CustomContext) {
     const uuidOne = uuidV4();
 
-    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
-    const url = this.apiClaims + `?uid=${user.id}`;
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(
+      context,
+      this.configService,
+    );
+    const url = this.apiUrl + `?uid=${user.id}`;
 
     let response, keyboard, replyMarkup, data;
 
@@ -298,9 +311,12 @@ export class ClaimsService {
   async getClaim(context: CustomContext, claimNo: number) {
     const uuidOne = uuidV4();
 
-    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(
+      context,
+      this.configService,
+    );
 
-    const url = this.apiClaims + `/${claimNo}?uid=${user.id}`;
+    const url = this.apiUrl + `/${claimNo}?uid=${user.id}`;
 
     let data, replyMarkup, response;
     let keyboard = [];

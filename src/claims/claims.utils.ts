@@ -1,5 +1,6 @@
 import { Context, Markup } from 'telegraf';
 import { Buttons } from './claims.buttons';
+import { ConfigService } from '@nestjs/config';
 
 export class ClaimsUtils {
   /**
@@ -77,7 +78,7 @@ export class ClaimsUtils {
    * @param context context of the request.
    * @returns the user and the config gor the claims API request.
    */
-  static getReqConfig(context: Context) {
+  static getReqConfig(context: Context, configService: ConfigService) {
     let query, user;
     try {
       query = context.callbackQuery;
@@ -89,8 +90,8 @@ export class ClaimsUtils {
 
     const requestConfig = {
       auth: {
-        username: process.env.API_USER,
-        password: process.env.API_PASS,
+        username: configService.get('API_USER'),
+        password: configService.get('API_PASS'),
       },
     };
 
@@ -102,7 +103,9 @@ export class ClaimsUtils {
     let errorMessage;
 
     if (error.response) {
-      errorMessage = `UUID: ${uuidOne}\nUSER_ID: ${user.id}\nCODE: ${error.response.data.statusCode}\nDATA: ${JSON.stringify(error, null, 3)}`;
+      errorMessage =
+        `UUID: ${uuidOne}\nUSER_ID: ${user.id}\n` +
+        `CODE: ${error.response.data.statusCode}\nDATA: ${JSON.stringify(error, null, 3)}`;
     } else {
       errorMessage = `UUID: ${uuidOne}\nUSER_ID: ${user.id}\nCODE: ${error.code}`;
     }

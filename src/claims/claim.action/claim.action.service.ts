@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import { catchError, firstValueFrom } from 'rxjs';
 import { CustomContext } from 'src/interfaces/context.interface';
@@ -6,24 +8,40 @@ import { Markup } from 'telegraf';
 import { transliterate } from 'transliteration';
 import { v4 as uuidV4 } from 'uuid';
 import { Buttons } from '../claims.buttons';
-import { ClaimsService } from '../claims.service';
 import { ClaimsUtils } from '../claims.utils';
 
 @Injectable()
 export class ClaimActionService {
-  constructor(private claimsService: ClaimsService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private configService: ConfigService,
+  ) {
+    const url = this.configService.get('API_URL');
+    const port = this.configService.get('API_PORT');
+    this.apiUrl = `http://${url}:${port}/claims/action`;
+  }
+
+  private readonly apiUrl;
+
+  readonly logger = new Logger(ClaimActionService.name);
 
   async claimAction(context: CustomContext) {
     const uuidOne = uuidV4();
 
+    console.log(this.apiUrl);
+
     if (process.argv.includes('dev')) {
-      this.claimsService.logger.log(
+      this.logger.log(
         `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
       );
     }
 
-    const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
-    const url = `${this.claimsService.apiClaims}/action?uid=${user.id}`;
+    const { user, requestConfig } = ClaimsUtils.getReqConfig(
+      context,
+      this.configService,
+    );
+
+    const apiAction = `${this.apiUrl}?uid=${user.id}`;
 
     let keyboard, action, page, response;
 
@@ -42,18 +60,18 @@ export class ClaimActionService {
           uuidOne,
           action,
           user,
-          url,
+          apiAction,
           requestConfig,
         );
         if (response.status == 0) {
-          this.claimsService.logger.log(
+          this.logger.log(
             `TAKEWORK: ${uuidOne}; ${action[4]}, ${JSON.stringify(user, null, 3)}; ${response['response']}`,
           );
 
           keyboard = [[Markup.button.callback('OK', `clgt_${action[4]}`)]];
           page = 'Заявка взята в работу';
         } else {
-          this.claimsService.logger.error(
+          this.logger.error(
             `TAKEWORK ERROR: ${uuidOne}; ${action[4]}, ${user}; ${JSON.stringify(response['error'], null, 3)};\
                  DATASEND: ${JSON.stringify(response['datasend'], null, 3)}; DATAREAD: ${JSON.stringify(response['dataread'], null, 3)}`,
           );
@@ -100,10 +118,10 @@ export class ClaimActionService {
 
           context.claimData = action;
 
-          this.claimsService.logger.log(
+          this.logger.log(
             `DEBBUG: context.claim = action; context.chat_data.claim_data = ${context.claimData}`,
           );
-          this.claimsService.logger.log(
+          this.logger.log(
             `DEBBUG: context.claim = action; update = ${context.update}`,
           );
 
@@ -116,32 +134,28 @@ export class ClaimActionService {
           uuidOne,
           action,
           user,
-          url,
+          apiAction,
           requestConfig,
         );
 
         try {
-          this.claimsService.logger.log(
+          this.logger.log(
             `DEBBUG context.bot.deleteMessage Trying: message_id = ${context.update?.['message'].message_id}`,
           );
           await context.deleteMessage(context.update?.['message'].message_id);
         } catch {
-          this.claimsService.logger.error(
+          this.logger.error(
             `message_id = ${context.update?.['message'].message_id}`,
           );
-          this.claimsService.logger.error(
-            JSON.stringify(context.claimData, null, 3),
-          );
-          this.claimsService.logger.error(
-            JSON.stringify(context.update, null, 3),
-          );
+          this.logger.error(JSON.stringify(context.claimData, null, 3));
+          this.logger.error(JSON.stringify(context.update, null, 3));
         }
 
         delete context.claimData;
         delete context.session['action'];
 
         if (response.status === 0) {
-          this.claimsService.logger.log(
+          this.logger.log(
             `${action[2]}; ${uuidOne}; ${action[4]}; ${user}; ${response.response}`,
           );
           keyboard = [[Buttons.getShortClaimsButton('OK')]];
@@ -170,7 +184,7 @@ export class ClaimActionService {
           context.scene.enter('START_SCENE');
           return;
         } else {
-          this.claimsService.logger.log(
+          this.logger.log(
             `${action[2]} ERROR: ${uuidOne}; ${action[4]}; ${JSON.stringify(user, null, 3)}; ` +
               `${response.error}; DATASEND: ${response.datasend}; DATAREAD: ${response.dataread}`,
           );
@@ -195,18 +209,18 @@ export class ClaimActionService {
           uuidOne,
           action,
           user,
-          url,
+          apiAction,
           requestConfig,
         );
 
         if (response.status === 0) {
-          this.claimsService.logger.log(
+          this.logger.log(
             `SENDDEFSMS: ${uuidOne}; ${action[4]}; ` +
               `${JSON.stringify(user, null, 3)}; ${response.response}`,
           );
           page = 'СМС отправлено';
         } else {
-          this.claimsService.logger.error(
+          this.logger.error(
             `SENDDEFSMS ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
               `${response.error}; DATASEND: ${response.datasend}; ` +
               `DATAREAD: ${response.dataread}`,
@@ -221,7 +235,7 @@ export class ClaimActionService {
         if (response.status === 0) {
           page = 'Функция в стадии разработки.';
         } else {
-          this.claimsService.logger.error(
+          this.logger.error(
             `COMMENT ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
               `${response.error}; DATASEND: ${response.datasend}; ` +
               `DATAREAD: ${response.dataread}`,
@@ -238,12 +252,12 @@ export class ClaimActionService {
           uuidOne,
           action,
           user,
-          url,
+          apiAction,
           requestConfig,
         );
 
         if (response.status === 0) {
-          this.claimsService.logger.log(
+          this.logger.log(
             `SENDDEFSMS: ${uuidOne}; ${action[4]}; ` +
               `${JSON.stringify(user, null, 3)}; ${response.response}`,
           );
@@ -265,7 +279,7 @@ export class ClaimActionService {
             page = ClaimsUtils.getMarkdownV2Shielded(page);
           }
         } else {
-          this.claimsService.logger.error(
+          this.logger.error(
             `GETACCOUNTS ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
               `${response.error}; DATASEND: ${response.datasend}; ` +
               `DATAREAD: ${response.dataread}`,
@@ -326,7 +340,7 @@ export class ClaimActionService {
     let response, res;
     try {
       response = await firstValueFrom(
-        this.claimsService.httpService.post(url, data, requestConfig).pipe(
+        this.httpService.post(url, data, requestConfig).pipe(
           catchError((error: AxiosError) => {
             throw error;
           }),

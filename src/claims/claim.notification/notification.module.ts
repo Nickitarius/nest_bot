@@ -1,10 +1,8 @@
-import { forwardRef, Module } from '@nestjs/common';
-import { NotificationService } from './notification.service';
+import { Module } from '@nestjs/common';
 import { ClaimNotificationController } from './claim.notification.controller';
-import { ClaimsModule } from '../claims.module';
+import { NotificationService } from './notification.service';
 
 @Module({
-  imports: [forwardRef(() => ClaimsModule)],
   providers: [NotificationService],
   controllers: [ClaimNotificationController],
 })
