@@ -8,7 +8,7 @@ import { CustomContext } from 'src/interfaces/context.interface';
 import { Markup, Telegraf } from 'telegraf';
 import { v4 as uuidV4 } from 'uuid';
 import { Pagination } from '../../telegraf-pagination';
-import { Buttons } from './buttons';
+import { Buttons } from './claims.buttons';
 import { ClaimsUtils } from './claims.utils';
 
 @Injectable()

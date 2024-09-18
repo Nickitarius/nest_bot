@@ -8,7 +8,6 @@ export class ClaimActionUpdates {
 
   @Action(/^cl_action/)
   async charactersPage(@Ctx() ctx: CustomContext) {
-    console.log('goyda');
     await this.calimActionService.claimAction(ctx);
   }
 }

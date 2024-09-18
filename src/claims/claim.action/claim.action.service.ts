@@ -5,7 +5,7 @@ import { CustomContext } from 'src/interfaces/context.interface';
 import { Markup } from 'telegraf';
 import { transliterate } from 'transliteration';
 import { v4 as uuidV4 } from 'uuid';
-import { Buttons } from '../buttons';
+import { Buttons } from '../claims.buttons';
 import { ClaimsService } from '../claims.service';
 import { ClaimsUtils } from '../claims.utils';
 
