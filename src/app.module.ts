@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { session } from 'telegraf';
 import { ClaimsModule } from './claims/claims.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -14,5 +16,7 @@ import { ClaimsModule } from './claims/claims.module';
     }),
     ClaimsModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

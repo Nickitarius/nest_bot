@@ -15,13 +15,15 @@ import { ClaimsUtils } from './claims.utils';
 export class ClaimsService {
   constructor(
     readonly httpService: HttpService,
-    @InjectBot() private bot: Telegraf<CustomContext>,
+    @InjectBot() readonly bot: Telegraf<CustomContext>,
   ) {}
   readonly logger = new Logger(ClaimsService.name);
   readonly apiClaims = `http://${process.env.API_URL}:${process.env.API_PORT}/claims`;
 
   async getShortClaims(context: CustomContext) {
     const uuidOne = uuidV4();
+
+    console.log(context.chat.id);
 
     const { user, requestConfig } = ClaimsUtils.getReqConfig(context);
     const url = this.apiClaims + `?uid=${user.id}`;
