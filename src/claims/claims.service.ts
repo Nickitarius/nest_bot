@@ -518,6 +518,7 @@ export class ClaimsService {
         }
 
         action.push(comment);
+        console.log(action);
         response = await this.actionMakePostReq(
           uuidOne,
           action,
@@ -550,13 +551,13 @@ export class ClaimsService {
 
           switch (action[2]) {
             case 'complete':
-              page = `Заявка ${action[4]} завершена\nКомментарий: ${action[7]}`;
+              page = `Заявка ${action[4]} завершена\nКомментарий: ${comment}`;
               break;
             case 'return':
-              page = `Заявка ${action[4]} возвращена\nКомментарий: ${action[7]}`;
+              page = `Заявка ${action[4]} возвращена\nКомментарий: ${comment}`;
               break;
             case 'addcomment':
-              page = `Коментарий отправлен.\nНомер заявки ${action[4]}\nКомментарий: ${action[7]}`;
+              page = `Коментарий отправлен.\nНомер заявки ${action[4]}\nКомментарий: ${comment}`;
               break;
             default:
               page = 'Что-то пошло не так';
@@ -584,7 +585,7 @@ export class ClaimsService {
         }
 
         page = ClaimsUtils.getMarkdownV2Shielded(page);
-        const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
+        let replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
         await context.reply(page, {
           reply_markup: replyMarkup,
           parse_mode: 'MarkdownV2',
@@ -593,7 +594,92 @@ export class ClaimsService {
         return;
         break;
       case 'senddefsms':
+        response = await this.actionMakePostReq(
+          uuidOne,
+          action,
+          user,
+          url,
+          requestConfig,
+        );
+
+        if (response.status === 0) {
+          this.logger.log(
+            `SENDDEFSMS: ${uuidOne}; ${action[4]}; ` +
+              `${JSON.stringify(user, null, 3)}; ${response.response}`,
+          );
+          page = 'СМС отправлено';
+        } else {
+          this.logger.error(
+            `SENDDEFSMS ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
+              `${response.error}; DATASEND: ${response.datasend}; ` +
+              `DATAREAD: ${response.dataread}`,
+          );
+          page =
+            `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
+            `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже`;
+        }
         break;
+      case 'comment':
+        if (response.status === 0) {
+          page = 'Функция в стадии разработки.';
+        } else {
+          this.logger.error(
+            `COMMENT ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
+              `${response.error}; DATASEND: ${response.datasend}; ` +
+              `DATAREAD: ${response.dataread}`,
+          );
+          page =
+            `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
+            `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже`;
+        }
+        keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
+        break;
+      case 'getaccounts':
+        response = await this.actionMakePostReq(
+          uuidOne,
+          action,
+          user,
+          url,
+          requestConfig,
+        );
+
+        if (response.status === 0) {
+          this.logger.log(
+            `SENDDEFSMS: ${uuidOne}; ${action[4]}; ` +
+              `${JSON.stringify(user, null, 3)}; ${response.response}`,
+          );
+          page = '***Учётные данные***\n\n';
+          const data = response.response;
+          if (data.length != 0) {
+            for (const account of data) {
+              account.tarplan_name = account.tarplan_name.replaceAll('_', '-');
+              account.status_name = account.status_name.replaceAll('_', '-');
+
+              page +=
+                `*Аккаунт код*:  ${account.account_code}` +
+                `\n*Статус*:  ${account.status_name}\n` +
+                `*Тарифный план*: ${account.tarplan_name}\n` +
+                `*Логин*: ${account.login}\n` +
+                `*Пароль*: ${account.password}\n\n`;
+            }
+            page = ClaimsUtils.getMarkdownV2Shielded(page);
+          }
+        } else {
+          this.logger.error(
+            `GETACCOUNTS ERROR: ${uuidOne}; ${action[4]}; ${user}; ` +
+              `${response.error}; DATASEND: ${response.datasend}; ` +
+              `DATAREAD: ${response.dataread}`,
+          );
+          page =
+            `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
+            `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
+            `Обратитесь к администратору или повторите попытку позже`;
+        }
+        keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
+        break;
+      default:
     }
 
     const replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
