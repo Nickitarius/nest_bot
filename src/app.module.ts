@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TelegrafModule } from 'nestjs-telegraf';
-import { ClaimsModule } from './claims/claims.module';
 import { session } from 'telegraf';
+import { ClaimsModule } from './claims/claims.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -14,5 +16,7 @@ import { session } from 'telegraf';
     }),
     ClaimsModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

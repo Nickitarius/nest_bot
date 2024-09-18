@@ -1,5 +1,5 @@
 import { Context, Markup } from 'telegraf';
-import { Buttons } from './buttons';
+import { Buttons } from './claims.buttons';
 
 export class ClaimsUtils {
   /**

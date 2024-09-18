@@ -1,7 +1,7 @@
 import { Markup } from 'telegraf';
 import { transliterate } from 'transliteration';
 
-/**A class with buttons for bot the bot. */
+/**A class with buttons for the bot. */
 export class Buttons {
   public static cancelButton = Markup.button.callback('Выход', 'cancel');
 

@@ -49,11 +49,6 @@ export class ClaimsUpdate {
     await this.claimsService.cancel(ctx);
   }
 
-  @Action(/^cl_action/)
-  async charactersPage(@Ctx() ctx: CustomContext) {
-    await this.claimsService.claimAction(ctx);
-  }
-
   /**
    * For testing get_list callback.
    */
