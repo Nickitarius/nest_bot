@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TelegrafModule } from 'nestjs-telegraf';
-import { ClaimsModule } from './claims/claims.module';
 import { session } from 'telegraf';
+import { ClaimsModule } from './claims/claims.module';
 
 @Module({
   imports: [

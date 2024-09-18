@@ -1,10 +1,10 @@
 import { Ctx, On, Scene, SceneEnter, SceneLeave } from 'nestjs-telegraf';
 import { CustomContext } from 'src/interfaces/context.interface';
-import { ClaimsService } from '../claims.service';
+import { ClaimActionService } from '../claim.action/claim.action.service';
 
 @Scene('COMMENT_SCENE')
 export class CommentScene {
-  constructor(private readonly claimsService: ClaimsService) {}
+  constructor(private claimActionService: ClaimActionService) {}
 
   @SceneEnter()
   onSceneEnter() {
@@ -18,9 +18,6 @@ export class CommentScene {
 
   @On('text')
   async readComment(@Ctx() context: CustomContext) {
-    console.log('text!');
-    console.log(context.session);
-    // await this.claimsService.readComment(context);
-    await this.claimsService.claimAction(context);
+    await this.claimActionService.claimAction(context);
   }
 }
