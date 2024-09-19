@@ -30,7 +30,8 @@ export class ClaimActionService {
 
     if (process.argv.includes('dev')) {
       this.logger.log(
-        `DEV: welcome to one function:\n####UPDATE####\n${JSON.stringify(context.update, null, 3)}\n####Update END####`,
+        `DEV: welcome to one function:\n####UPDATE####\n` +
+          `${JSON.stringify(context.update, null, 3)}\n####Update END####`,
       );
     }
 
