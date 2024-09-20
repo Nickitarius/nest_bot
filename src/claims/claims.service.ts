@@ -60,10 +60,20 @@ export class ClaimsService {
       const total = data.claims.length;
       let newClaims = 0;
       let takenWork = 0;
-      let assigned = null;
+      let assigned = '\\-';
       keyboard = [];
 
-      data.claims.forEach((claim) => {
+      let max, claim;
+
+      if (data.claims.length >= 10) {
+        max = 10;
+      } else {
+        max = data.length;
+      }
+
+      for (let i = 0; i < max; i++) {
+        claim = data.claims[i];
+
         claim = {
           claim_no: claim.claim_no,
           claim_addr: claim.claim_addr,
@@ -85,7 +95,7 @@ export class ClaimsService {
         }
 
         keyboard.push([Buttons.getClaimButton(claim)]);
-      });
+      }
 
       page =
         `***Список Заявок***\n` +
