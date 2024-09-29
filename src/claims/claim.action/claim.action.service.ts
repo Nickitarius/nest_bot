@@ -40,6 +40,9 @@ export class ClaimActionService {
       this.configService,
     );
 
+    console.log('cd');
+    console.log(context.claimData);
+
     const apiAction = `${this.apiUrl}?uid=${user.id}`;
 
     let keyboard, action, page, response;
@@ -115,10 +118,10 @@ export class ClaimActionService {
             parse_mode: 'MarkdownV2',
           });
 
-          context.claimData = action;
+          // context.claimData = action;
 
           this.logger.log(
-            `DEBBUG: context.claim = action; context.chat_data.claim_data = ${context.claimData}`,
+            `DEBBUG: context.claim = action; context.chat_data.claim_data = ${context.session['claimData']}`,
           );
           this.logger.log(
             `DEBBUG: context.claim = action; update = ${context.update}`,
@@ -146,11 +149,13 @@ export class ClaimActionService {
           this.logger.error(
             `message_id = ${context.update?.['message'].message_id}`,
           );
-          this.logger.error(JSON.stringify(context.claimData, null, 3));
+          this.logger.error(
+            JSON.stringify(context.session['claimData'], null, 3),
+          );
           this.logger.error(JSON.stringify(context.update, null, 3));
         }
 
-        delete context.claimData;
+        delete context.session['claimData'];
         delete context.session['action'];
 
         if (response.status === 0) {
@@ -187,7 +192,9 @@ export class ClaimActionService {
             `${action[2]} ERROR: ${uuidOne}; ${action[4]}; ${JSON.stringify(user, null, 3)}; ` +
               `${response.error}; DATASEND: ${response.datasend}; DATAREAD: ${response.dataread}`,
           );
-          keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
+          keyboard = [
+            [Buttons.getClaimButton(context.session['claimData'], 'OK')],
+          ];
           page =
             `*${response.dataread}*\n\n${response.error}\nType: ${action[2]}\n` +
             `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
@@ -229,7 +236,15 @@ export class ClaimActionService {
             `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
             `Обратитесь к администратору или повторите попытку позже`;
         }
+        // context.claimData = action;
+        // console.log(context.claimData);
+        // console.log(action);
+
+        keyboard = [
+          [Buttons.getClaimButton(context.session['claimData'], 'OK')],
+        ];
         break;
+
       case 'comment':
         if (response.status === 0) {
           page = 'Функция в стадии разработки.';
@@ -244,7 +259,9 @@ export class ClaimActionService {
             `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
             `Обратитесь к администратору или повторите попытку позже`;
         }
-        keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
+        keyboard = [
+          [Buttons.getClaimButton(context.session['claimData'], 'OK')],
+        ];
         break;
       case 'getaccounts':
         response = await this.actionMakePostReq(
@@ -257,11 +274,11 @@ export class ClaimActionService {
 
         if (response.status === 0) {
           this.logger.log(
-            `SENDDEFSMS: ${uuidOne}; ${action[4]}; ` +
+            `GETACCOUNTS: ${uuidOne}; ${action[4]}; ` +
               `${JSON.stringify(user, null, 3)}; ${response.response}`,
           );
           page = '***Учётные данные***\n\n';
-          const data = response.response;
+          const data = response.response.data;
           if (data.length != 0) {
             for (const account of data) {
               account.tarplan_name = account.tarplan_name.replaceAll('_', '-');
@@ -287,7 +304,10 @@ export class ClaimActionService {
             `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
             `Обратитесь к администратору или повторите попытку позже`;
         }
-        keyboard = [[Buttons.getClaimButton(context.claimData, 'OK')]];
+        console.log(context.session['claimData']);
+        keyboard = [
+          [Buttons.getClaimButton(context.session['claimData'], 'OK')],
+        ];
         break;
       default:
     }

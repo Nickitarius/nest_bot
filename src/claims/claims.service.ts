@@ -68,7 +68,7 @@ export class ClaimsService {
       if (data.claims.length >= 10) {
         max = 10;
       } else {
-        max = data.length;
+        max = data.claims.length;
       }
 
       for (let i = 0; i < max; i++) {
@@ -266,14 +266,13 @@ export class ClaimsService {
     if (data.claims.length == 1) {
       paginator.isEnableItemButtons = false;
 
-      let claim = data.claims[0];
-      claim ??= 666;
-      switch (claim.id) {
+      const claim = data.claims[0];
+      switch (claim.status_id) {
         case 10:
         case 20:
           customButtons.push([Buttons.takeWorkButton(claim)]);
           break;
-        case 666:
+        case undefined:
           this.logger.warn(
             `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data, null, 3)}`,
           );
@@ -401,7 +400,7 @@ export class ClaimsService {
       keyboard.push([Buttons.getShortClaimsButton('К списку')]);
       replyMarkup = Markup.inlineKeyboard(keyboard).reply_markup;
 
-      context.claimData = data;
+      context.session['claimData'] = data;
 
       try {
         await context.editMessageText(page, {
