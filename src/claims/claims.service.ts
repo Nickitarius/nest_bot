@@ -272,6 +272,8 @@ export class ClaimsService {
         case 20:
           customButtons.push([Buttons.takeWorkButton(claim)]);
           break;
+        case 50:
+          break;
         case undefined:
           this.logger.warn(
             `UUIF: ${uuidOne}; User: ${user.id}(${user.username}); Claim has no defined status_id; data = ${JSON.stringify(data, null, 3)}`,
@@ -381,6 +383,8 @@ export class ClaimsService {
         case 10:
         case 20:
           keyboard.push([Buttons.takeWorkButton(data)]);
+          break;
+        case 50:
           break;
         case undefined:
           this.logger.warn(
