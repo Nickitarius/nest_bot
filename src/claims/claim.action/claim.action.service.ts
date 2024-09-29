@@ -40,9 +40,6 @@ export class ClaimActionService {
       this.configService,
     );
 
-    console.log('cd');
-    console.log(context.claimData);
-
     const apiAction = `${this.apiUrl}?uid=${user.id}`;
 
     let keyboard, action, page, response;
@@ -236,9 +233,6 @@ export class ClaimActionService {
             `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
             `Обратитесь к администратору или повторите попытку позже`;
         }
-        // context.claimData = action;
-        // console.log(context.claimData);
-        // console.log(action);
 
         keyboard = [
           [Buttons.getClaimButton(context.session['claimData'], 'OK')],
@@ -304,7 +298,6 @@ export class ClaimActionService {
             `Claim: ${action[4]}\nUser Id: ${user.id}\nUUID: ${uuidOne}\n\n` +
             `Обратитесь к администратору или повторите попытку позже`;
         }
-        console.log(context.session['claimData']);
         keyboard = [
           [Buttons.getClaimButton(context.session['claimData'], 'OK')],
         ];
